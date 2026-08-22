@@ -39,18 +39,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_activity'])) {
     } elseif (empty($activity_date)) {
         $error_message = "Please choose a date for this activity.";
     } else {
-        $sql_check = "SELECT TRIP_STOP.Stop_ID
+        $sql_check = "SELECT TRIP_STOP.Stop_ID, TRIP_STOP.Arrival_Date, TRIP_STOP.Departure_Date
                       FROM TRIP_STOP
                       JOIN TRIP ON TRIP_STOP.Trip_ID = TRIP.Trip_ID
                       WHERE TRIP_STOP.Stop_ID = ? AND TRIP.User_ID = ?";
         $stmt = $conn->prepare($sql_check);
         $stmt->bind_param("ii", $stop_id, $user_id);
         $stmt->execute();
-        $owns_stop = $stmt->get_result()->num_rows > 0;
+        $stop_row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
-        if (!$owns_stop) {
+        if (!$stop_row) {
             $error_message = "Invalid trip stop selected.";
+        } elseif ($activity_date < $stop_row['Arrival_Date'] || $activity_date > $stop_row['Departure_Date']) {
+            $error_message = "Activity date must be within the stop's stay dates (" .
+                date("d M Y", strtotime($stop_row['Arrival_Date'])) . " - " .
+                date("d M Y", strtotime($stop_row['Departure_Date'])) . ").";
         } else {
             $sql_insert = "INSERT INTO ITINERARY (Stop_ID, Activity_ID, Activity_Date, Activity_Cost)
                             VALUES (?, ?, ?, ?)";
@@ -74,7 +78,8 @@ $sql_activities = "SELECT ACTIVITY.Activity_ID, ACTIVITY.Activity_Name, ACTIVITY
                    ORDER BY ACTIVITY.Activity_Name";
 $all_activities = $conn->query($sql_activities)->fetch_all(MYSQLI_ASSOC);
 
-$sql_stops = "SELECT TRIP_STOP.Stop_ID, TRIP_STOP.City_ID, TRIP.Trip_Name, CITY.City_Name
+$sql_stops = "SELECT TRIP_STOP.Stop_ID, TRIP_STOP.City_ID, TRIP_STOP.Arrival_Date, TRIP_STOP.Departure_Date,
+                     TRIP.Trip_Name, CITY.City_Name
               FROM TRIP_STOP
               JOIN TRIP ON TRIP_STOP.Trip_ID = TRIP.Trip_ID
               JOIN CITY ON TRIP_STOP.City_ID = CITY.City_ID
@@ -266,6 +271,7 @@ data-bs-toggle="modal" data-bs-target="#addModal<?php echo $activity['Activity_I
 <?php foreach ($matching_stops as $stop): ?>
 <option value="<?php echo $stop['Stop_ID']; ?>">
 <?php echo htmlspecialchars($stop['Trip_Name']); ?> - <?php echo htmlspecialchars($stop['City_Name']); ?>
+(<?php echo date("d M", strtotime($stop['Arrival_Date'])); ?> - <?php echo date("d M", strtotime($stop['Departure_Date'])); ?>)
 </option>
 <?php endforeach; ?>
 </select>
