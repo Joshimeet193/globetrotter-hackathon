@@ -36,6 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_activity'])) {
 
     if (empty($stop_id)) {
         $error_message = "Please select a trip stop first!";
+    } elseif (empty($activity_date)) {
+        $error_message = "Please choose a date for this activity.";
     } else {
         $sql_check = "SELECT TRIP_STOP.Stop_ID
                       FROM TRIP_STOP
@@ -99,6 +101,8 @@ $filtered_activities = array_filter($all_activities, function ($activity) use ($
 
 $all_types = array_unique(array_column($all_activities, 'Activity_Type'));
 sort($all_types);
+
+$type_accent = ['sightseeing' => 'var(--teal)', 'food' => 'var(--stamp)', 'adventure' => 'var(--gold)'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -106,11 +110,21 @@ sort($all_types);
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Activity Search - GlobeTrotter</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<style>
+.activity-type-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: 'Space Mono', monospace; font-size: 0.72rem;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  color: #fff; padding: 4px 10px; border-radius: 20px; margin-bottom: 10px;
+}
+.activity-empty-hint {
+  border-top: 2px dashed var(--line); margin-top: 10px; padding-top: 8px;
+}
+</style>
 </head>
 <body>
 
@@ -123,10 +137,10 @@ sort($all_types);
 </div>
 
 <?php if ($success_message): ?>
-<div class="alert alert-success"><?php echo $success_message; ?></div>
+<div class="alert alert-success"><i class="bi bi-check-circle"></i> <?php echo htmlspecialchars($success_message); ?></div>
 <?php endif; ?>
 <?php if ($error_message): ?>
-<div class="alert alert-danger"><?php echo $error_message; ?></div>
+<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> <?php echo htmlspecialchars($error_message); ?></div>
 <?php endif; ?>
 
 <form method="GET" class="row g-2 mb-4">
@@ -143,11 +157,11 @@ sort($all_types);
 </div>
 <div class="col-md-2">
 <label class="form-label">Min Cost (₹)</label>
-<input type="number" name="min_cost" class="form-control" value="<?php echo htmlspecialchars($min_cost ?? ''); ?>" placeholder="0">
+<input type="number" name="min_cost" min="0" class="form-control" value="<?php echo htmlspecialchars($min_cost ?? ''); ?>" placeholder="0">
 </div>
 <div class="col-md-2">
 <label class="form-label">Max Cost (₹)</label>
-<input type="number" name="max_cost" class="form-control" value="<?php echo htmlspecialchars($max_cost ?? ''); ?>" placeholder="5000">
+<input type="number" name="max_cost" min="0" class="form-control" value="<?php echo htmlspecialchars($max_cost ?? ''); ?>" placeholder="5000">
 </div>
 <div class="col-md-3">
 <label class="form-label">Duration (hours)</label>
@@ -164,10 +178,12 @@ sort($all_types);
 </div>
 </form>
 
+<p class="text-muted mb-3"><i class="bi bi-stars"></i> <?php echo count($filtered_activities); ?> activit<?php echo count($filtered_activities) === 1 ? 'y' : 'ies'; ?> found</p>
+
 <div class="row g-4">
 <?php if (count($filtered_activities) === 0): ?>
 <div class="col-12">
-<div class="alert alert-warning">No activities match your filters. Try adjusting them.</div>
+<div class="alert alert-warning"><i class="bi bi-emoji-frown"></i> No activities match your filters. Try adjusting them.</div>
 </div>
 <?php else: ?>
 <?php foreach ($filtered_activities as $activity): ?>
@@ -175,6 +191,7 @@ sort($all_types);
 $matching_stops = array_filter($user_stops, function ($stop) use ($activity) {
     return $stop['City_ID'] == $activity['City_ID'];
 });
+$accent = $type_accent[strtolower($activity['Activity_Type'])] ?? 'var(--ink-soft)';
 ?>
 <div class="col-md-4 col-lg-3">
 <div class="card h-100">
@@ -182,7 +199,7 @@ $matching_stops = array_filter($user_stops, function ($stop) use ($activity) {
 <img src="<?php echo htmlspecialchars($activity['Image']); ?>" class="card-img-top" alt="<?php echo htmlspecialchars($activity['Activity_Name']); ?>">
 <?php endif; ?>
 <div class="card-body">
-<span class="badge bg-secondary mb-2">
+<span class="activity-type-chip" style="background-color: <?php echo $accent; ?>;">
 <i class="bi <?php echo type_icon($activity['Activity_Type']); ?>"></i>
 <?php echo htmlspecialchars(ucfirst($activity['Activity_Type'])); ?>
 </span>
@@ -203,7 +220,7 @@ data-bs-toggle="modal" data-bs-target="#addModal<?php echo $activity['Activity_I
 <?php endif; ?>
 </div>
 <?php if (count($matching_stops) === 0): ?>
-<small class="d-block mt-2"><i class="bi bi-info-circle"></i> Add <?php echo htmlspecialchars($activity['City_Name']); ?> to a trip first.</small>
+<p class="activity-empty-hint text-muted small mb-0"><i class="bi bi-info-circle"></i> Add <?php echo htmlspecialchars($activity['City_Name']); ?> to a trip first.</p>
 <?php endif; ?>
 </div>
 </div>
