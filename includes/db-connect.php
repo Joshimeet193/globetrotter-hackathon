@@ -1,42 +1,19 @@
 <?php
-
 // =====================================================
 // Database Connection File
 // GlobeTrotter
 // =====================================================
-
-
-// MySQL server name
 $host = "localhost";
-
-// MySQL username
 $username = "root";
-
-// MySQL password
 $password = "";   // XAMPP ma normally blank hoy chhe
-
-// Database name
 $database = "globetrotter";
 
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
-// Create connection
-$conn = new mysqli(
-    $host,
-    $username,
-    $password,
-    $database
-);
-
-
-// Check connection
-if ($conn->connect_error) {
-
-    die("Database Connection Failed: " . $conn->connect_error);
-
+try {
+    $conn = new mysqli($host, $username, $password, $database);
+    $conn->set_charset("utf8mb4");
+} catch (mysqli_sql_exception $e) {
+    die("Database Connection Failed: " . $e->getMessage());
 }
-
-
-// Set character encoding
-$conn->set_charset("utf8mb4");
-
 ?>
