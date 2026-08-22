@@ -64,6 +64,24 @@ foreach ($recent_trips as $key => $trip) {
 $stmt->close();
 
 // -----------------------------------------------------
+// STEP 3.5: Quick stats - total trips, cities covered, total budget
+// -----------------------------------------------------
+$stmt = $conn->prepare("SELECT COUNT(*) AS trip_count, COALESCE(SUM(Budget), 0) AS total_budget FROM TRIP WHERE User_ID = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$stats = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+$stmt = $conn->prepare("SELECT COUNT(DISTINCT TRIP_STOP.City_ID) AS city_count
+                         FROM TRIP_STOP
+                         JOIN TRIP ON TRIP_STOP.Trip_ID = TRIP.Trip_ID
+                         WHERE TRIP.User_ID = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$city_stat = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+// -----------------------------------------------------
 // STEP 4: Popular cities - sabse popular 6 cities lavo
 // -----------------------------------------------------
 $sql_popular = "SELECT CITY.City_ID, CITY.City_Name, CITY.Image, COUNTRY.Country_Name
@@ -92,27 +110,61 @@ $popular_cities = $conn->query($sql_popular)->fetch_all(MYSQLI_ASSOC);
 
 <body>
 
-<!-- ===== NAVBAR ===== -->
-<nav class="navbar navbar-expand-lg">
-<div class="container">
-<a class="navbar-brand" href="dashboard.php">🌍 GlobeTrotter</a>
-<div class="d-flex">
-<a href="city-search.php" class="btn btn-outline-primary btn-sm me-2"><i class="bi bi-search"></i> City Search</a>
-<a href="activity-search.php" class="btn btn-outline-primary btn-sm me-2"><i class="bi bi-search"></i> Activity Search</a>
-<a href="my-trips.php" class="btn btn-outline-primary btn-sm me-2"><i class="bi bi-suitcase"></i> My Trips</a>
-<a href="logout.php" class="btn btn-secondary btn-sm"><i class="bi bi-box-arrow-right"></i> Logout</a>
-</div>
-</div>
-</nav>
+<?php $active_page = 'dashboard'; include 'includes/navbar.php'; ?>
 
 <div class="container my-4">
 
 <!-- ===== WELCOME SECTION ===== -->
-<div class="row mb-4">
-<div class="col-12">
-<h2 class="section-title">Welcome back, <?php echo htmlspecialchars($user_name); ?> <i class="bi bi-hand-thumbs-up"></i></h2>
-<p>Ready to plan your next adventure?</p>
+<div class="dashboard-hero mb-4">
+<div class="row align-items-center">
+<div class="col-md-8">
+<h2 class="section-title mb-1">Welcome back, <?php echo htmlspecialchars($user_name); ?> <i class="bi bi-hand-thumbs-up"></i></h2>
+<p class="text-muted mb-3">Ready to plan your next adventure?</p>
 <a href="create-trip.php" class="btn btn-primary"><i class="bi bi-airplane"></i> Plan New Trip</a>
+</div>
+<div class="col-md-4 text-md-end mt-3 mt-md-0">
+<i class="bi bi-globe-americas dashboard-hero-icon"></i>
+</div>
+</div>
+</div>
+
+<!-- ===== QUICK STATS ===== -->
+<div class="row g-3 mb-5">
+<div class="col-6 col-md-3">
+<div class="card stat-card h-100 text-center">
+<div class="card-body">
+<i class="bi bi-suitcase-lg icon-circle mx-auto"></i>
+<h3 class="mb-0"><?php echo (int) $stats['trip_count']; ?></h3>
+<p class="text-muted small mb-0">Trips Planned</p>
+</div>
+</div>
+</div>
+<div class="col-6 col-md-3">
+<div class="card stat-card h-100 text-center">
+<div class="card-body">
+<i class="bi bi-geo-alt icon-circle mx-auto"></i>
+<h3 class="mb-0"><?php echo (int) $city_stat['city_count']; ?></h3>
+<p class="text-muted small mb-0">Cities Added</p>
+</div>
+</div>
+</div>
+<div class="col-6 col-md-3">
+<div class="card stat-card h-100 text-center">
+<div class="card-body">
+<i class="bi bi-wallet2 icon-circle mx-auto"></i>
+<h3 class="mb-0">₹<?php echo number_format($stats['total_budget']); ?></h3>
+<p class="text-muted small mb-0">Total Budget</p>
+</div>
+</div>
+</div>
+<div class="col-6 col-md-3">
+<div class="card stat-card h-100 text-center">
+<div class="card-body">
+<i class="bi bi-compass icon-circle mx-auto"></i>
+<h3 class="mb-0"><?php echo count($popular_cities); ?>+</h3>
+<p class="text-muted small mb-0">Places to Explore</p>
+</div>
+</div>
 </div>
 </div>
 
@@ -195,6 +247,7 @@ aria-valuenow="<?php echo $trip['percent_used']; ?>" aria-valuemin="0" aria-valu
 
 <footer><p>Made with <span>❤️</span> for GlobeTrotter Hackathon</p></footer>
 
+<script src="js/script.js"></script>
 </body>
 
 </html>
