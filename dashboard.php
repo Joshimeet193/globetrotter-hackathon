@@ -1,79 +1,81 @@
 <?php
 // =====================================================
 // dashboard.php
-// Logged-in user nu home page - welcome msg, recent trips,
-// "Plan New Trip" button, ane popular cities (hardcoded)
+// Logged-in user nu home page - welcome msg, recent trips
+// (with budget snapshot), "Plan New Trip" button, popular cities.
+// Aa file HAVE REAL DATABASE TABLES vapare chhe (CITY, TRIP, ITINERARY)
+// kem ke actual schema ma aa tables already banela chhe.
 // =====================================================
 
-// Step 1: Session start karvi padse har protected page ma
-// Jethi apane khabar pade ke user login chhe ke nai
 session_start();
-
-// Step 2: Database connection file include karo
 include 'includes/db-connect.php';
 
-// Step 3: Login check - agar session ma 'user_id' nathi to login page par mokli do
+// Login check - session ma user_id nathi to login page mokli do
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
-    exit(); // exit() bahu important chhe - header pachi code chalvanu band thai jaay
+    exit();
 }
-
-// Step 4: Session mathi current user nu ID lai lo
 $user_id = $_SESSION['user_id'];
 
-// Step 5: Database mathi is user nu full_name lavo (prepared statement - SQL injection safe)
-$sql_user = "SELECT full_name FROM users WHERE user_id = ?";
+// -----------------------------------------------------
+// STEP 1: User nu naam lavo (table column nu naam "Name" chhe, "full_name" nahi)
+// -----------------------------------------------------
+$sql_user = "SELECT Name FROM USERS WHERE User_ID = ?";
 $stmt = $conn->prepare($sql_user);
-$stmt->bind_param("i", $user_id); // "i" means integer parameter
+$stmt->bind_param("i", $user_id);
 $stmt->execute();
-$result_user = $stmt->get_result();
-$user_data = $result_user->fetch_assoc();
-$user_name = $user_data['full_name'] ?? 'Traveler';
+$user_data = $stmt->get_result()->fetch_assoc();
+$user_name = $user_data['Name'] ?? 'Traveler';
 $stmt->close();
 
-// Step 6: User na last 3 trips lavo (sabse recent trips upar dekhaay)
-$sql_trips = "SELECT trip_id, trip_name, start_date, end_date, cover_photo 
-              FROM trips 
-              WHERE user_id = ? 
-              ORDER BY trip_id DESC 
+// -----------------------------------------------------
+// STEP 2: User na last 3 trips lavo (TRIP table mathi, Budget field sathe)
+// -----------------------------------------------------
+$sql_trips = "SELECT Trip_ID, Trip_Name, Start_Date, End_Date, Cover_Photo, Budget 
+              FROM TRIP 
+              WHERE User_ID = ? 
+              ORDER BY Trip_ID DESC 
               LIMIT 3";
 $stmt = $conn->prepare($sql_trips);
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
-$result_trips = $stmt->get_result();
-
-$recent_trips = [];
-while ($row = $result_trips->fetch_assoc()) {
-    $recent_trips[] = $row;
-}
+$recent_trips = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-// Step 6.5: Har trip nu estimated cost calculate karo (budget highlight mate)
-// activities.cost ne stops thi trip sathe JOIN karine SUM lai lo
-// (Trip level par koi budget "target" nathi database ma, etle just total spend batavi rahya chhe)
-$sql_cost = "SELECT COALESCE(SUM(activities.cost), 0) AS total_cost 
-             FROM activities 
-             JOIN stops ON activities.stop_id = stops.stop_id 
-             WHERE stops.trip_id = ?";
-$stmt = $conn->prepare($sql_cost);
+// -----------------------------------------------------
+// STEP 3: Har trip nu "spent so far" calculate karo (Budget highlight mate)
+// Spent = ITINERARY table na Activity_Cost no sum, TRIP_STOP thi trip sathe joined
+// (Aa amount reflect kare chhe je activities Activity Search thi add thai)
+// -----------------------------------------------------
+$sql_spent = "SELECT COALESCE(SUM(ITINERARY.Activity_Cost), 0) AS spent
+              FROM ITINERARY
+              JOIN TRIP_STOP ON ITINERARY.Stop_ID = TRIP_STOP.Stop_ID
+              WHERE TRIP_STOP.Trip_ID = ?";
+$stmt = $conn->prepare($sql_spent);
 foreach ($recent_trips as $key => $trip) {
-    $stmt->bind_param("i", $trip['trip_id']);
+    $stmt->bind_param("i", $trip['Trip_ID']);
     $stmt->execute();
-    $cost_result = $stmt->get_result()->fetch_assoc();
-    // Har trip array ma ek naya key 'total_cost' add kari didhu
-    $recent_trips[$key]['total_cost'] = $cost_result['total_cost'];
+    $spent_row = $stmt->get_result()->fetch_assoc();
+    $spent  = (float) $spent_row['spent'];
+    $budget = (float) $trip['Budget'];
+
+    $recent_trips[$key]['spent'] = $spent;
+    // Budget 0 hoy to divide-by-zero na thay, etle check karyu
+    $recent_trips[$key]['percent_used'] = $budget > 0 ? min(100, round(($spent / $budget) * 100)) : 0;
+    $recent_trips[$key]['is_over_budget'] = $budget > 0 && $spent > $budget;
 }
 $stmt->close();
 
-// Step 7: Popular/recommended cities - HARDCODED array (database ma nathi)
-$popular_cities = [
-    ["name" => "Goa",      "country" => "India",  "image" => "https://placehold.co/400x250?text=Goa"],
-    ["name" => "Manali",   "country" => "India",  "image" => "https://placehold.co/400x250?text=Manali"],
-    ["name" => "Jaipur",   "country" => "India",  "image" => "https://placehold.co/400x250?text=Jaipur"],
-    ["name" => "Paris",    "country" => "France", "image" => "https://placehold.co/400x250?text=Paris"],
-    ["name" => "Dubai",    "country" => "UAE",    "image" => "https://placehold.co/400x250?text=Dubai"],
-    ["name" => "Bali",     "country" => "Indonesia", "image" => "https://placehold.co/400x250?text=Bali"],
-];
+// -----------------------------------------------------
+// STEP 4: Popular cities - HAVE REAL CITY table chhe, etle DB mathi
+// sabse popular 6 cities lavo (Popularity column ORDER BY DESC)
+// -----------------------------------------------------
+$sql_popular = "SELECT CITY.City_ID, CITY.City_Name, CITY.Image, COUNTRY.Country_Name
+                FROM CITY
+                JOIN COUNTRY ON CITY.Country_ID = COUNTRY.Country_ID
+                ORDER BY CITY.Popularity DESC
+                LIMIT 6";
+$popular_cities = $conn->query($sql_popular)->fetch_all(MYSQLI_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -106,7 +108,6 @@ $popular_cities = [
     <!-- ===== WELCOME SECTION ===== -->
     <div class="row mb-4">
         <div class="col-12">
-            <!-- htmlspecialchars() vaparyu chhe security mate - XSS attack thi bachva -->
             <h2 class="section-title">Welcome back, <?php echo htmlspecialchars($user_name); ?> <i class="bi bi-hand-thumbs-up"></i></h2>
             <p>Ready to plan your next adventure?</p>
             <a href="create-trip.php" class="btn btn-primary"><i class="bi bi-airplane"></i> Plan New Trip</a>
@@ -117,7 +118,6 @@ $popular_cities = [
     <h3 class="section-title">Your Recent Trips</h3>
     <div class="row g-4 mb-5">
         <?php if (count($recent_trips) === 0): ?>
-            <!-- Agar koi trip nathi to friendly message batao -->
             <div class="col-12">
                 <div class="alert alert-info">
                     You haven't planned any trips yet. Click "Plan New Trip" to get started!
@@ -128,21 +128,37 @@ $popular_cities = [
                 <div class="col-md-4">
                     <div class="card h-100">
                         <?php
-                        // Agar cover_photo database ma set chhe to eno use karo, nahi to default placeholder
-                        $photo = !empty($trip['cover_photo']) ? $trip['cover_photo'] : 'https://placehold.co/400x200?text=Trip';
+                        $photo = !empty($trip['Cover_Photo']) ? $trip['Cover_Photo'] : 'https://placehold.co/400x200?text=Trip';
                         ?>
-                        <img src="<?php echo htmlspecialchars($photo); ?>" class="card-img-top" alt="<?php echo htmlspecialchars($trip['trip_name']); ?>">
+                        <img src="<?php echo htmlspecialchars($photo); ?>" class="card-img-top" alt="<?php echo htmlspecialchars($trip['Trip_Name']); ?>">
                         <div class="card-body">
-                            <h5 class="card-title"><?php echo htmlspecialchars($trip['trip_name']); ?></h5>
+                            <h5 class="card-title"><?php echo htmlspecialchars($trip['Trip_Name']); ?></h5>
                             <p class="card-text mb-1">
                                 <i class="bi bi-calendar3"></i>
-                                <?php echo htmlspecialchars($trip['start_date']); ?> to <?php echo htmlspecialchars($trip['end_date']); ?>
+                                <?php echo htmlspecialchars($trip['Start_Date']); ?> to <?php echo htmlspecialchars($trip['End_Date']); ?>
                             </p>
-                            <!-- Budget highlight - estimated cost so far based on added activities -->
-                            <p class="card-text mb-2">
-                                <i class="bi bi-wallet2"></i> Estimated cost: ₹<?php echo number_format($trip['total_cost']); ?>
-                            </p>
-                            <a href="trip-details.php?id=<?php echo $trip['trip_id']; ?>" class="btn btn-outline-primary btn-sm">View Trip</a>
+
+                            <!-- ===== BUDGET HIGHLIGHT ===== -->
+                            <?php if ($trip['Budget'] > 0): ?>
+                                <p class="card-text mb-1">
+                                    <i class="bi bi-wallet2"></i>
+                                    ₹<?php echo number_format($trip['spent']); ?> / ₹<?php echo number_format($trip['Budget']); ?> spent
+                                </p>
+                                <div class="progress mb-2" style="height: 8px;">
+                                    <div class="progress-bar <?php echo $trip['is_over_budget'] ? 'bg-over-budget' : ''; ?>"
+                                         role="progressbar"
+                                         style="width: <?php echo $trip['percent_used']; ?>%;"
+                                         aria-valuenow="<?php echo $trip['percent_used']; ?>" aria-valuemin="0" aria-valuemax="100">
+                                    </div>
+                                </div>
+                                <?php if ($trip['is_over_budget']): ?>
+                                    <small class="text-danger"><i class="bi bi-exclamation-triangle"></i> Over budget!</small>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <p class="card-text mb-2"><i class="bi bi-wallet2"></i> No budget set for this trip</p>
+                            <?php endif; ?>
+
+                            <a href="trip-details.php?id=<?php echo $trip['Trip_ID']; ?>" class="btn btn-outline-primary btn-sm">View Trip</a>
                         </div>
                     </div>
                 </div>
@@ -150,20 +166,27 @@ $popular_cities = [
         <?php endif; ?>
     </div>
 
-    <!-- ===== POPULAR CITIES SECTION (Static Data) ===== -->
+    <!-- ===== POPULAR CITIES SECTION (Real CITY table, ordered by Popularity) ===== -->
     <h3 class="section-title">Popular Destinations</h3>
     <div class="row g-4">
-        <?php foreach ($popular_cities as $city): ?>
-            <div class="col-md-4 col-lg-2 col-6">
-                <div class="card h-100">
-                    <img src="<?php echo $city['image']; ?>" class="card-img-top" alt="<?php echo htmlspecialchars($city['name']); ?>">
-                    <div class="card-body">
-                        <h6 class="card-title mb-1"><?php echo htmlspecialchars($city['name']); ?></h6>
-                        <p class="card-text"><i class="bi bi-geo-alt"></i> <?php echo htmlspecialchars($city['country']); ?></p>
+        <?php if (count($popular_cities) === 0): ?>
+            <div class="col-12">
+                <div class="alert alert-info">No cities in the database yet.</div>
+            </div>
+        <?php else: ?>
+            <?php foreach ($popular_cities as $city): ?>
+                <div class="col-md-4 col-lg-2 col-6">
+                    <div class="card h-100">
+                        <?php $city_image = !empty($city['Image']) ? $city['Image'] : 'https://placehold.co/300x180?text=' . urlencode($city['City_Name']); ?>
+                        <img src="<?php echo htmlspecialchars($city_image); ?>" class="card-img-top" alt="<?php echo htmlspecialchars($city['City_Name']); ?>">
+                        <div class="card-body">
+                            <h6 class="card-title mb-1"><?php echo htmlspecialchars($city['City_Name']); ?></h6>
+                            <p class="card-text"><i class="bi bi-geo-alt"></i> <?php echo htmlspecialchars($city['Country_Name']); ?></p>
+                        </div>
                     </div>
                 </div>
-            </div>
-        <?php endforeach; ?>
+            <?php endforeach; ?>
+        <?php endif; ?>
     </div>
 
 </div>
