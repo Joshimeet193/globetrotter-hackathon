@@ -6,9 +6,6 @@ CREATE SCHEMA globetrotter;
 
 USE globetrotter;
 
--- =====================================================
--- USERS
--- =====================================================
 CREATE TABLE USERS (
     User_ID INT(11) AUTO_INCREMENT PRIMARY KEY,
     Name VARCHAR(50) NOT NULL,
@@ -19,18 +16,12 @@ CREATE TABLE USERS (
     Created_At DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- =====================================================
--- COUNTRY
--- =====================================================
 CREATE TABLE COUNTRY (
     Country_ID INT(11) AUTO_INCREMENT PRIMARY KEY,
     Country_Name VARCHAR(60) NOT NULL UNIQUE,
     Region VARCHAR(60)
 );
 
--- =====================================================
--- CITY
--- =====================================================
 CREATE TABLE CITY (
     City_ID INT(11) AUTO_INCREMENT PRIMARY KEY,
     Country_ID INT(11) NOT NULL,
@@ -45,9 +36,6 @@ CREATE TABLE CITY (
         REFERENCES COUNTRY(Country_ID)
 );
 
--- =====================================================
--- TRIP
--- =====================================================
 CREATE TABLE TRIP (
     Trip_ID INT(11) AUTO_INCREMENT PRIMARY KEY,
     User_ID INT(11) NOT NULL,
@@ -64,14 +52,6 @@ CREATE TABLE TRIP (
         REFERENCES USERS(User_ID)
 );
 
--- =====================================================
--- TRIP_STOP
--- FIX: Trip_ID and Stop_Order were incorrectly marked
--- individually UNIQUE, which would allow only ONE stop
--- per trip. Changed to a composite UNIQUE so a trip can
--- have multiple stops, but stop order stays unique
--- within that trip.
--- =====================================================
 CREATE TABLE TRIP_STOP (
     Stop_ID INT(11) AUTO_INCREMENT PRIMARY KEY,
     Trip_ID INT(11) NOT NULL,
@@ -92,9 +72,6 @@ CREATE TABLE TRIP_STOP (
         UNIQUE (Trip_ID, Stop_Order)
 );
 
--- =====================================================
--- ACTIVITY
--- =====================================================
 CREATE TABLE ACTIVITY (
     Activity_ID INT(11) AUTO_INCREMENT PRIMARY KEY,
     City_ID INT(11) NOT NULL,
@@ -110,9 +87,6 @@ CREATE TABLE ACTIVITY (
         REFERENCES CITY(City_ID)
 );
 
--- =====================================================
--- ITINERARY
--- =====================================================
 CREATE TABLE ITINERARY (
     Itinerary_ID INT(11) AUTO_INCREMENT PRIMARY KEY,
     Stop_ID INT(11) NOT NULL,
@@ -132,9 +106,6 @@ CREATE TABLE ITINERARY (
         REFERENCES ACTIVITY(Activity_ID)
 );
 
--- =====================================================
--- EXPENSE
--- =====================================================
 CREATE TABLE EXPENSE (
     Expense_ID INT(11) AUTO_INCREMENT PRIMARY KEY,
     Trip_ID INT(11) NOT NULL,
@@ -153,15 +124,6 @@ CREATE TABLE EXPENSE (
         REFERENCES TRIP_STOP(Stop_ID)
 );
 
--- =====================================================
--- SAVED_DESTINATION
--- FIX: User_ID and City_ID were individually UNIQUE,
--- which would let a user save only ONE city ever, and a
--- city be saved by only ONE user ever. Changed to a
--- composite UNIQUE so a user can save many cities, and a
--- city can be saved by many users, but the SAME user
--- can't save the SAME city twice.
--- =====================================================
 CREATE TABLE SAVED_DESTINATION (
     Saved_ID INT(11) AUTO_INCREMENT PRIMARY KEY,
     User_ID INT(11) NOT NULL,
@@ -180,13 +142,6 @@ CREATE TABLE SAVED_DESTINATION (
         UNIQUE (User_ID, City_ID)
 );
 
--- =====================================================
--- TRIP_SHARE
--- FIX: Trip_ID was individually UNIQUE, which would let
--- a trip be shared with only ONE person ever. Changed to
--- a composite UNIQUE so a trip can be shared with many
--- people, but not shared with the SAME person twice.
--- =====================================================
 CREATE TABLE TRIP_SHARE (
     Share_ID INT(11) AUTO_INCREMENT PRIMARY KEY,
     Trip_ID INT(11) NOT NULL,
