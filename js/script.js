@@ -1,8 +1,6 @@
 // GlobeTrotter - small UI polish, no framework needed.
-
 document.addEventListener('DOMContentLoaded', function () {
   var navbar = document.querySelector('.navbar');
-
   // Shrink navbar + stronger shadow after scrolling a bit
   if (navbar) {
     var onScroll = function () {
@@ -15,7 +13,6 @@ document.addEventListener('DOMContentLoaded', function () {
     window.addEventListener('scroll', onScroll);
     onScroll();
   }
-
   // Auto-close the mobile menu after tapping a link (Bootstrap doesn't do this by default)
   var navCollapse = document.querySelector('.navbar-collapse');
   if (navCollapse) {
