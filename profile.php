@@ -1,4 +1,3 @@
-
 <?php
 
 // Start session
@@ -225,6 +224,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                     // Update session name
                     $_SESSION["Name"] = $name;
+                    $_SESSION["full_name"] = $name;
 
                     $message = "Profile updated successfully!";
                     $message_type = "success";
