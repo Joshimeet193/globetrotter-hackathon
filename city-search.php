@@ -104,13 +104,15 @@ $all_cities = $conn->query($sql_cities)->fetch_all(MYSQLI_ASSOC);
 $search_term = $_GET['search'] ?? '';
 $filter_region = $_GET['region'] ?? '';
 $filter_country = $_GET['country'] ?? '';
+$filter_cost = $_GET['cost'] ?? '';
 
 // PHP ma j filter karo (array_filter)
-$filtered_cities = array_filter($all_cities, function ($city) use ($search_term, $filter_region, $filter_country) {
+$filtered_cities = array_filter($all_cities, function ($city) use ($search_term, $filter_region, $filter_country, $filter_cost) {
     $matches_search = empty($search_term) || stripos($city['City_Name'], $search_term) !== false;
     $matches_region = empty($filter_region) || $city['Region'] === $filter_region;
     $matches_country = empty($filter_country) || $city['Country_Name'] === $filter_country;
-    return $matches_search && $matches_region && $matches_country;
+    $matches_cost = empty($filter_cost) || cost_label($city['Cost_Index'])['label'] === $filter_cost;
+    return $matches_search && $matches_region && $matches_country && $matches_cost;
 });
 
 // Dropdown mate unique regions/countries kadhi lo
@@ -118,6 +120,17 @@ $all_regions = array_unique(array_column($all_cities, 'Region'));
 $all_countries = array_unique(array_column($all_cities, 'Country_Name'));
 sort($all_regions);
 sort($all_countries);
+
+// Sort results
+$sort_by = $_GET['sort'] ?? 'popularity';
+if ($sort_by === 'name') {
+    usort($filtered_cities, fn($a, $b) => strcasecmp($a['City_Name'], $b['City_Name']));
+} elseif ($sort_by === 'cost_low') {
+    usort($filtered_cities, fn($a, $b) => $a['Cost_Index'] <=> $b['Cost_Index']);
+} elseif ($sort_by === 'cost_high') {
+    usort($filtered_cities, fn($a, $b) => $b['Cost_Index'] <=> $a['Cost_Index']);
+}
+// 'popularity' = keep DB order (already ORDER BY Popularity DESC)
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -139,7 +152,10 @@ sort($all_countries);
 
 <div class="container my-4">
 
-<h2 class="section-title"><i class="bi bi-geo-alt"></i> Search Cities</h2>
+<div class="dashboard-hero mb-4">
+<h2 class="section-title mb-1"><i class="bi bi-geo-alt"></i> Search Cities</h2>
+<p class="text-muted mb-0">Find your next destination and add it straight to a trip.</p>
+</div>
 
 <?php if ($success_message): ?>
 <div class="alert alert-success"><?php echo $success_message; ?></div>
@@ -150,12 +166,12 @@ sort($all_countries);
 
 <!-- ===== SEARCH + FILTER FORM (GET method) ===== -->
 <form method="GET" class="row g-2 mb-4">
-<div class="col-md-5">
+<div class="col-md-4">
 <label class="form-label"><i class="bi bi-search"></i> City Name</label>
 <input type="text" name="search" class="form-control" placeholder="Search city name..."
 value="<?php echo htmlspecialchars($search_term); ?>">
 </div>
-<div class="col-md-3">
+<div class="col-md-2">
 <label class="form-label">Region</label>
 <select name="region" class="form-select">
 <option value="">All Regions</option>
@@ -166,7 +182,7 @@ value="<?php echo htmlspecialchars($search_term); ?>">
 <?php endforeach; ?>
 </select>
 </div>
-<div class="col-md-3">
+<div class="col-md-2">
 <label class="form-label">Country</label>
 <select name="country" class="form-select">
 <option value="">All Countries</option>
@@ -175,6 +191,24 @@ value="<?php echo htmlspecialchars($search_term); ?>">
 <?php echo htmlspecialchars($country); ?>
 </option>
 <?php endforeach; ?>
+</select>
+</div>
+<div class="col-md-2">
+<label class="form-label">Cost</label>
+<select name="cost" class="form-select">
+<option value="">Any Cost</option>
+<option value="Low" <?php echo $filter_cost === 'Low' ? 'selected' : ''; ?>>Low</option>
+<option value="Medium" <?php echo $filter_cost === 'Medium' ? 'selected' : ''; ?>>Medium</option>
+<option value="High" <?php echo $filter_cost === 'High' ? 'selected' : ''; ?>>High</option>
+</select>
+</div>
+<div class="col-md-1">
+<label class="form-label">Sort</label>
+<select name="sort" class="form-select">
+<option value="popularity" <?php echo $sort_by === 'popularity' ? 'selected' : ''; ?>>Popular</option>
+<option value="name" <?php echo $sort_by === 'name' ? 'selected' : ''; ?>>Name</option>
+<option value="cost_low" <?php echo $sort_by === 'cost_low' ? 'selected' : ''; ?>>Cost ↑</option>
+<option value="cost_high" <?php echo $sort_by === 'cost_high' ? 'selected' : ''; ?>>Cost ↓</option>
 </select>
 </div>
 <div class="col-md-1 d-flex align-items-end">
