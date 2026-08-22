@@ -4,22 +4,20 @@ includes/navbar.php
 ---------------------------------------------
 Reusable navbar so every page looks the same.
 Before including this file, set a variable:
-   $active_page = 'dashboard'; // or 'city-search', 'activity-search', 'my-trips'
+   $active_page = 'dashboard'; // or 'city-search', 'activity-search', 'my-trips', 'profile'
 That variable is used below to highlight the current link.
+NOTE: calling page must have session_start() before this include.
 */
 ?>
 <nav class="navbar navbar-expand-lg shadow-sm sticky-top" id="gtMainNavbar">
 <div class="container">
-
 <a class="navbar-brand d-flex align-items-center gap-2" href="dashboard.php">
 <span>🌍 GlobeTrotter</span>
 <span class="d-none d-lg-inline" style="font-family:'Space Mono',monospace; font-size:0.65rem; letter-spacing:0.08em; color: var(--gold); border:1px solid rgba(255,255,255,0.25); padding:2px 8px; border-radius:20px;">GT&#8209;01</span>
 </a>
-
 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#gtNavbar">
 <span class="navbar-toggler-icon"></span>
 </button>
-
 <div class="collapse navbar-collapse" id="gtNavbar">
 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
 <li class="nav-item">
@@ -43,7 +41,6 @@ That variable is used below to highlight the current link.
 </a>
 </li>
 </ul>
-
 <div class="d-flex align-items-center gap-2">
 <a href="create-trip.php" class="btn btn-primary btn-sm">
 <i class="bi bi-plus-circle"></i> Plan New Trip
@@ -59,10 +56,7 @@ That variable is used below to highlight the current link.
 </div>
 </div>
 </nav>
-
 <script>
-// Adds the "navbar-scrolled" class (tighter padding + deeper shadow,
-// already styled in css/style.css) once the page scrolls past 40px.
 (function () {
   const nav = document.getElementById('gtMainNavbar');
   if (!nav) return;
