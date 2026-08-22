@@ -23,8 +23,8 @@ $message = "";
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     // Get email and password from form
-    $email = trim($_POST["email"]);
-    $password = $_POST["password"];
+    $email = trim($_POST["email"] ?? "");
+    $password = $_POST["password"] ?? "";
 
 
     // Check if fields are empty
@@ -42,52 +42,72 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         // Prepare SQL query
         $stmt = $conn->prepare($sql);
 
-        // Bind email to ?
-        $stmt->bind_param("s", $email);
+        // Check whether query preparation was successful
+        if ($stmt === false) {
 
-        // Execute query
-        $stmt->execute();
-
-        // Get result
-        $result = $stmt->get_result();
-
-
-        // Check if user exists
-        if ($result->num_rows == 1) {
-
-            // Get user's data
-            $user = $result->fetch_assoc();
-
-
-            // Verify entered password with hashed password
-            if (password_verify($password, $user["Password"])) {
-
-                // Store user information in session
-                $_SESSION["User_ID"] = $user["User_ID"];
-                $_SESSION["Name"] = $user["Name"];
-                $_SESSION["user_id"] = $user["User_ID"];   // alias: some pages check lowercase key
-                $_SESSION["full_name"] = $user["Name"];    // alias: navbar.php checks this key
-
-
-                // Redirect to dashboard
-                header("Location: dashboard.php");
-                exit();
-
-            } else {
-
-                $message = "Invalid email or password.";
-
-            }
+            $message = "Something went wrong. Please try again.";
 
         } else {
 
-            $message = "Invalid email or password.";
+            // Bind email to ?
+            $stmt->bind_param("s", $email);
 
+            // Execute query
+            if ($stmt->execute()) {
+
+                // Get result
+                $result = $stmt->get_result();
+
+
+                // Check if user exists
+                if ($result->num_rows == 1) {
+
+                    // Get user's data
+                    $user = $result->fetch_assoc();
+
+
+                    // Verify entered password with hashed password
+                    if (password_verify($password, $user["Password"])) {
+
+                        // Regenerate session ID after successful login
+                        session_regenerate_id(true);
+
+
+                        // Store user information in session
+                        $_SESSION["User_ID"] = $user["User_ID"];
+                        $_SESSION["Name"] = $user["Name"];
+
+                        // Aliases used by other pages
+                        $_SESSION["user_id"] = $user["User_ID"];
+                        $_SESSION["full_name"] = $user["Name"];
+
+
+                        // Redirect to dashboard
+                        header("Location: dashboard.php");
+                        exit();
+
+                    } else {
+
+                        $message = "Invalid email or password.";
+
+                    }
+
+                } else {
+
+                    $message = "Invalid email or password.";
+
+                }
+
+            } else {
+
+                $message = "Something went wrong. Please try again.";
+
+            }
+
+
+            // Close statement
+            $stmt->close();
         }
-
-
-        // Close statement
-        $stmt->close();
     }
 }
 
@@ -173,6 +193,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             gap: 26px;
             margin-top: 30px;
         }
+
         .ticket-meta div span {
             display: block;
             color: var(--gold);
@@ -187,13 +208,33 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             padding: 46px 40px;
         }
 
-        .ticket-form .icon-circle { margin-bottom: 6px; }
+        .ticket-form .icon-circle {
+            margin-bottom: 6px;
+        }
 
         @media (max-width: 767.98px) {
-            .ticket-wrap { flex-direction: column; margin: 20px auto; border-radius: 14px; }
-            .ticket-stub { padding: 30px 26px; }
-            .ticket-stub::before { border-right: none; border-bottom: 3px dashed rgba(255,255,255,0.18); right: 0; bottom: -1px; top: auto; height: 0; }
-            .ticket-form { padding: 30px 26px; }
+            .ticket-wrap {
+                flex-direction: column;
+                margin: 20px auto;
+                border-radius: 14px;
+            }
+
+            .ticket-stub {
+                padding: 30px 26px;
+            }
+
+            .ticket-stub::before {
+                border-right: none;
+                border-bottom: 3px dashed rgba(255,255,255,0.18);
+                right: 0;
+                bottom: -1px;
+                top: auto;
+                height: 0;
+            }
+
+            .ticket-form {
+                padding: 30px 26px;
+            }
         }
     </style>
 
@@ -220,16 +261,35 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <div class="ticket-stub">
             <div>
                 <div class="mb-3" style="font-size:1.6rem;">✈️</div>
-                <h1>Your next trip<br>starts with one login.</h1>
-                <p class="lede">Plan stops, track budgets and build itineraries that actually hold together — sign back in to pick up where you left off.</p>
+
+                <h1>
+                    Your next trip<br>
+                    starts with one login.
+                </h1>
+
+                <p class="lede">
+                    Plan stops, track budgets and build itineraries that actually hold together — sign back in to pick up where you left off.
+                </p>
             </div>
 
             <div class="ticket-meta">
-                <div>Status <span>Boarding</span></div>
-                <div>Class <span>Explorer</span></div>
-                <div>Gate <span>GT‑01</span></div>
+                <div>
+                    Status
+                    <span>Boarding</span>
+                </div>
+
+                <div>
+                    Class
+                    <span>Explorer</span>
+                </div>
+
+                <div>
+                    Gate
+                    <span>GT-01</span>
+                </div>
             </div>
         </div>
+
 
         <!-- Right: the actual login form -->
         <div class="ticket-form">
@@ -239,7 +299,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </div>
 
             <h2 class="mb-1">Welcome Back</h2>
-            <p class="text-muted mb-4">Login to continue your journey</p>
+
+            <p class="text-muted mb-4">
+                Login to continue your journey
+            </p>
+
 
             <?php if (!empty($message)) { ?>
 
@@ -250,9 +314,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             <?php } ?>
 
+
             <form method="POST" action="">
 
                 <div class="form-floating mb-3">
+
                     <input
                         type="email"
                         class="form-control"
@@ -261,13 +327,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         placeholder="Email Address"
                         required
                     >
+
                     <label for="email">
                         <i class="bi bi-envelope me-2"></i>
                         Email Address
                     </label>
+
                 </div>
 
+
                 <div class="form-floating mb-3">
+
                     <input
                         type="password"
                         class="form-control"
@@ -276,17 +346,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         placeholder="Password"
                         required
                     >
+
                     <label for="password">
                         <i class="bi bi-lock me-2"></i>
                         Password
                     </label>
+
                 </div>
 
+
                 <div class="text-end mb-3">
+
                     <a href="#" class="small">
                         Forgot Password?
                     </a>
+
                 </div>
+
 
                 <button
                     type="submit"
@@ -298,11 +374,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             </form>
 
+
             <p class="text-center mt-4 mb-0">
+
                 Don't have an account?
+
                 <a href="signup.php">
                     Sign Up
                 </a>
+
             </p>
 
         </div>
@@ -313,9 +393,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 
 <footer>
+
     <p>
         Made with <span>❤️</span> for GlobeTrotter Hackathon
     </p>
+
 </footer>
 
 
