@@ -10,10 +10,21 @@
 }
 
 /* ===== Base ===== */
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background-color: var(--bg-color);
   color: var(--text-color);
   font-family: 'Inter', sans-serif;
+  animation: pageFadeIn 0.5s ease both;
+  overflow-x: hidden;
+}
+
+@keyframes pageFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 h1, h2, h3, h4, h5, h6,
@@ -27,10 +38,44 @@ h1, h2, h3, h4, h5, h6,
 a {
   color: var(--primary-color);
   text-decoration: none;
+  transition: color 0.25s ease;
 }
 
 a:hover {
   color: var(--primary-dark);
+}
+
+/* ===== Entrance animation ===== */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.container > *,
+.card,
+.timeline-day {
+  animation: fadeUp 0.55s ease both;
+}
+
+/* Stagger cards inside a row so they don't all pop at once */
+.row.g-4 > div:nth-child(1),
+.row.g-3 > div:nth-child(1) { animation-delay: 0.05s; }
+.row.g-4 > div:nth-child(2),
+.row.g-3 > div:nth-child(2) { animation-delay: 0.12s; }
+.row.g-4 > div:nth-child(3),
+.row.g-3 > div:nth-child(3) { animation-delay: 0.19s; }
+.row.g-4 > div:nth-child(4),
+.row.g-3 > div:nth-child(4) { animation-delay: 0.26s; }
+.row.g-4 > div:nth-child(5),
+.row.g-3 > div:nth-child(5) { animation-delay: 0.33s; }
+.row.g-4 > div:nth-child(6),
+.row.g-3 > div:nth-child(6) { animation-delay: 0.40s; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, .card, .container > *, .timeline-day, body {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 /* ===== Navbar ===== */
@@ -38,39 +83,91 @@ a:hover {
   background-color: var(--secondary-color) !important;
   padding: 14px 0;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  transition: box-shadow 0.3s ease, padding 0.3s ease;
+  animation: none; /* navbar shouldn't fade, only content should */
+}
+
+.navbar.navbar-scrolled {
+  padding: 8px 0;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.18);
 }
 
 .navbar .navbar-brand {
   color: #ffffff !important;
   font-weight: 700;
   font-size: 1.5rem;
+  transition: transform 0.25s ease;
+}
+
+.navbar .navbar-brand:hover {
+  transform: scale(1.04);
 }
 
 .navbar .nav-link {
   color: #f0f0f0 !important;
   font-weight: 500;
   margin: 0 8px;
+  position: relative;
   transition: color 0.3s ease;
 }
 
-.navbar .nav-link:hover {
+.navbar .nav-link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 0;
+  height: 2px;
+  background-color: var(--primary-color);
+  transition: width 0.25s ease;
+}
+
+.navbar .nav-link:hover::after,
+.navbar .nav-link.active::after {
+  width: 100%;
+}
+
+.navbar .nav-link:hover,
+.navbar .nav-link.active {
+  color: var(--primary-color) !important;
+}
+
+.navbar-profile-link {
+  color: #f0f0f0 !important;
+  font-weight: 500;
+  text-decoration: none;
+  padding: 6px 10px;
+  border-radius: 20px;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.navbar-profile-link:hover,
+.navbar-profile-link.active {
+  background-color: rgba(255, 255, 255, 0.12);
   color: var(--primary-color) !important;
 }
 
 /* ===== Buttons ===== */
+.btn {
+  transition: all 0.25s ease;
+}
+
 .btn-primary {
   background-color: var(--primary-color);
   border: none;
   border-radius: var(--btn-radius);
   padding: 10px 28px;
   font-weight: 500;
-  transition: all 0.3s ease;
 }
 
 .btn-primary:hover {
   background-color: var(--primary-dark);
   box-shadow: 0 6px 16px rgba(255, 107, 74, 0.35);
   transform: translateY(-2px);
+}
+
+.btn-primary:active {
+  transform: translateY(0) scale(0.97);
 }
 
 .btn-secondary {
@@ -80,7 +177,6 @@ a:hover {
   color: #ffffff;
   padding: 10px 28px;
   font-weight: 500;
-  transition: all 0.3s ease;
 }
 
 .btn-secondary:hover {
@@ -90,17 +186,21 @@ a:hover {
   transform: translateY(-2px);
 }
 
+.btn-secondary:active {
+  transform: translateY(0) scale(0.97);
+}
+
 .btn-outline-primary {
   border: 2px solid var(--primary-color);
   color: var(--primary-color);
   border-radius: var(--btn-radius);
   font-weight: 500;
-  transition: all 0.3s ease;
 }
 
 .btn-outline-primary:hover {
   background-color: var(--primary-color);
   color: #ffffff;
+  transform: translateY(-2px);
 }
 
 /* ===== Cards (trip cards, city cards, activity cards) ===== */
@@ -108,7 +208,7 @@ a:hover {
   border: none;
   border-radius: var(--card-radius);
   box-shadow: 0 4px 14px rgba(0,0,0,0.08);
-  transition: all 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
   overflow: hidden;
   margin-bottom: 20px;
 }
@@ -121,6 +221,11 @@ a:hover {
 .card-img-top {
   height: 180px;
   object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.card:hover .card-img-top {
+  transform: scale(1.05);
 }
 
 .card-body {
@@ -152,6 +257,7 @@ a:hover {
   border-radius: 10px;
   border: 1px solid #ddd;
   padding: 10px 14px;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 .form-control:focus, .form-select:focus {
@@ -171,6 +277,7 @@ a:hover {
   padding: 40px 32px;
   border-radius: var(--card-radius);
   box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  animation: fadeUp 0.5s ease both;
 }
 
 .auth-container h2 {
@@ -181,6 +288,12 @@ a:hover {
 .auth-container .btn-primary {
   width: 100%;
   margin-top: 10px;
+}
+
+/* ===== Alerts ===== */
+.alert {
+  animation: fadeUp 0.35s ease both;
+  border-radius: 10px;
 }
 
 /* ===== Icons ===== */
@@ -195,6 +308,11 @@ a:hover {
   justify-content: center;
   font-size: 1.3rem;
   margin-bottom: 10px;
+  transition: transform 0.3s ease;
+}
+
+.icon-circle:hover {
+  transform: rotate(8deg) scale(1.08);
 }
 
 /* ===== Budget Progress Bars ===== */
@@ -203,11 +321,13 @@ a:hover {
   border-radius: 20px;
   background-color: #eee;
   margin-bottom: 14px;
+  overflow: hidden;
 }
 
 .progress-bar {
   background-color: var(--accent-color);
   border-radius: 20px;
+  transition: width 0.6s ease;
 }
 
 .progress-bar.bg-over-budget {
@@ -285,4 +405,82 @@ footer span {
 
 .bg-cream {
   background-color: var(--bg-color);
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+/* Tablets */
+@media (max-width: 991.98px) {
+  .navbar-collapse {
+    background-color: var(--secondary-color);
+    padding: 14px 10px;
+    border-radius: 10px;
+    margin-top: 10px;
+    animation: fadeUp 0.3s ease both;
+  }
+
+  .navbar .nav-link {
+    margin: 4px 0;
+  }
+
+  .navbar-profile-link {
+    display: inline-block !important;
+    margin: 6px 0;
+  }
+
+  .card-img-top {
+    height: 160px;
+  }
+}
+
+/* Phones */
+@media (max-width: 575.98px) {
+  h1, .section-title {
+    font-size: 1.4rem;
+  }
+
+  .container {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .card-body {
+    padding: 16px;
+  }
+
+  .btn-primary, .btn-secondary, .btn-outline-primary {
+    padding: 9px 18px;
+    font-size: 0.92rem;
+  }
+
+  .auth-container {
+    margin: 24px auto;
+    padding: 28px 20px;
+  }
+
+  .navbar .navbar-brand {
+    font-size: 1.2rem;
+  }
+
+  .timeline-day {
+    padding-left: 14px;
+  }
+
+  .d-flex.gap-2.justify-content-center {
+    flex-direction: column;
+  }
+
+  .d-flex.gap-2.justify-content-center .btn {
+    width: 100%;
+  }
+}
+
+/* Small height mobile: keep footer from crowding content */
+@media (max-width: 575.98px) {
+  footer {
+    margin-top: 40px;
+    padding: 14px 0;
+  }
 }
