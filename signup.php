@@ -202,180 +202,221 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 
 <!-- =========================
-     SIGNUP FORM
+     SIGNUP — mirrored boarding-pass ticket, so this reads as
+     the other half of the same document as the login page
      ========================= -->
 
 <div class="container">
 
-    <div class="auth-container">
+    <div class="ticket-wrap ticket-wrap--reverse">
 
+        <!-- Left stub: brand moment, matches login's but with its own copy -->
+        <div class="ticket-stub">
+            <div>
+                <div class="mb-3" style="font-size:1.6rem;">🧳</div>
 
-        <!-- Signup Icon -->
+                <h1>
+                    One account.<br>
+                    Every trip ahead.
+                </h1>
 
-        <div class="icon-circle mx-auto">
+                <p class="lede">
+                    Save your stops, track your budget, and pick up planning from any device — starting with today's sign-up.
+                </p>
+            </div>
 
-            <i class="bi bi-person-plus"></i>
+            <div class="ticket-meta">
+                <div>
+                    Passport
+                    <span>New</span>
+                </div>
 
+                <div>
+                    Validity
+                    <span>Lifetime</span>
+                </div>
+
+                <div>
+                    Class
+                    <span>Explorer</span>
+                </div>
+            </div>
         </div>
 
 
-        <!-- Heading -->
+        <!-- Right: the actual signup form -->
+        <div class="ticket-form">
 
-        <h2>Create Account</h2>
-
-        <p class="text-center text-muted mb-4">
-            Start planning your next adventure
-        </p>
-
-
-        <!-- Display Message -->
-
-        <?php if (!empty($message)) { ?>
-
-            <div
-                class="alert alert-<?php echo $message_type; ?>"
-                role="alert"
-            >
-
-                <?php if ($message_type == "success") { ?>
-
-                    <i class="bi bi-check-circle me-2"></i>
-
-                <?php } else { ?>
-
-                    <i class="bi bi-exclamation-circle me-2"></i>
-
-                <?php } ?>
-
-
-                <?php echo htmlspecialchars($message, ENT_QUOTES, "UTF-8"); ?>
-
+            <div class="icon-circle">
+                <i class="bi bi-person-plus"></i>
             </div>
 
-        <?php } ?>
+            <h2 class="mb-1">Create Account</h2>
+
+            <p class="text-muted mb-4">
+                Start planning your next adventure
+            </p>
 
 
-        <!-- Signup Form -->
+            <!-- Display Message -->
 
-        <form method="POST" action="">
-            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION["csrf_token"], ENT_QUOTES, "UTF-8"); ?>">
+            <?php if (!empty($message)) { ?>
 
-
-            <!-- Full Name -->
-
-            <div class="form-floating mb-3">
-
-                <input
-                    type="text"
-                    class="form-control"
-                    id="name"
-                    name="name"
-                    placeholder="Full Name"
-                    maxlength="50"
-                    required
+                <div
+                    class="alert alert-<?php echo $message_type; ?>"
+                    role="alert"
                 >
 
-                <label for="name">
+                    <?php if ($message_type == "success") { ?>
 
-                    <i class="bi bi-person me-2"></i>
+                        <i class="bi bi-check-circle me-2"></i>
 
-                    Full Name
+                    <?php } else { ?>
 
-                </label>
+                        <i class="bi bi-exclamation-circle me-2"></i>
 
-            </div>
+                    <?php } ?>
 
 
-            <!-- Email -->
+                    <?php echo htmlspecialchars($message, ENT_QUOTES, "UTF-8"); ?>
 
-            <div class="form-floating mb-3">
+                </div>
 
-                <input
-                    type="email"
-                    class="form-control"
-                    id="email"
-                    name="email"
-                    placeholder="Email Address"
-                    maxlength="100"
-                    required
+            <?php } ?>
+
+
+            <!-- Signup Form -->
+
+            <form method="POST" action="">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION["csrf_token"], ENT_QUOTES, "UTF-8"); ?>">
+
+
+                <!-- Full Name -->
+
+                <div class="form-floating mb-3">
+
+                    <input
+                        type="text"
+                        class="form-control"
+                        id="name"
+                        name="name"
+                        placeholder="Full Name"
+                        maxlength="50"
+                        required
+                    >
+
+                    <label for="name">
+
+                        <i class="bi bi-person me-2"></i>
+
+                        Full Name
+
+                    </label>
+
+                </div>
+
+
+                <!-- Email -->
+
+                <div class="form-floating mb-3">
+
+                    <input
+                        type="email"
+                        class="form-control"
+                        id="email"
+                        name="email"
+                        placeholder="Email Address"
+                        maxlength="100"
+                        required
+                    >
+
+                    <label for="email">
+
+                        <i class="bi bi-envelope me-2"></i>
+
+                        Email Address
+
+                    </label>
+
+                </div>
+
+
+                <!-- Password -->
+
+                <div class="form-floating mb-3 password-field">
+
+                    <input
+                        type="password"
+                        class="form-control"
+                        id="password"
+                        name="password"
+                        placeholder="Password"
+                        minlength="8"
+                        required
+                    >
+
+                    <label for="password">
+
+                        <i class="bi bi-lock me-2"></i>
+
+                        Password
+
+                    </label>
+
+                    <button
+                        type="button"
+                        class="password-toggle-btn"
+                        data-toggle-for="password"
+                        aria-label="Show password"
+                        aria-pressed="false"
+                    >
+                        <i class="bi bi-eye"></i>
+                    </button>
+
+                </div>
+
+
+                <!-- Password Information -->
+
+                <div class="small text-muted mb-3">
+
+                    <i class="bi bi-shield-check me-1"></i>
+
+                    Password must be at least 8 characters.
+
+                </div>
+
+
+                <!-- Signup Button -->
+
+                <button
+                    type="submit"
+                    class="btn btn-primary w-100"
                 >
 
-                <label for="email">
+                    <i class="bi bi-person-plus me-2"></i>
 
-                    <i class="bi bi-envelope me-2"></i>
+                    Create Account
 
-                    Email Address
-
-                </label>
-
-            </div>
+                </button>
 
 
-            <!-- Password -->
-
-            <div class="form-floating mb-3">
-
-                <input
-                    type="password"
-                    class="form-control"
-                    id="password"
-                    name="password"
-                    placeholder="Password"
-                    minlength="8"
-                    required
-                >
-
-                <label for="password">
-
-                    <i class="bi bi-lock me-2"></i>
-
-                    Password
-
-                </label>
-
-            </div>
+            </form>
 
 
-            <!-- Password Information -->
+            <!-- Login Link -->
 
-            <div class="small text-muted mb-3">
+            <p class="text-center mt-4 mb-0">
 
-                <i class="bi bi-shield-check me-1"></i>
+                Already have an account?
 
-                Password must be at least 8 characters.
+                <a href="index.php">
+                    Login
+                </a>
 
-            </div>
+            </p>
 
-
-            <!-- Signup Button -->
-
-            <button
-                type="submit"
-                class="btn btn-primary"
-            >
-
-                <i class="bi bi-person-plus me-2"></i>
-
-                Create Account
-
-            </button>
-
-
-        </form>
-
-
-        <!-- Login Link -->
-
-        <p class="text-center mt-4 mb-0">
-
-            Already have an account?
-
-            <a href="index.php">
-                Login
-            </a>
-
-        </p>
-
+        </div>
 
     </div>
 
@@ -393,6 +434,23 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     </p>
 
 </footer>
+
+
+<script>
+    document.querySelectorAll(".password-toggle-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            var input = document.getElementById(btn.getAttribute("data-toggle-for"));
+            var icon = btn.querySelector("i");
+            var showing = input.type === "text";
+
+            input.type = showing ? "password" : "text";
+            icon.classList.toggle("bi-eye", showing);
+            icon.classList.toggle("bi-eye-slash", !showing);
+            btn.setAttribute("aria-pressed", String(!showing));
+            btn.setAttribute("aria-label", showing ? "Show password" : "Hide password");
+        });
+    });
+</script>
 
 
 </body>
