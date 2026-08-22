@@ -16,10 +16,13 @@ session_set_cookie_params([
 
 session_start();
 
-// Clear all session data.
+// Clear all session data (covers user_id, User_ID, Name, user_name,
+// full_name, csrf_token — every key used across the app).
 $_SESSION = [];
 
-// Expire the session cookie as well.
+// Also expire the session cookie itself in the browser.
+// session_destroy() alone only clears server-side data; without this,
+// the browser keeps sending the old (now-invalid) session cookie.
 if (ini_get("session.use_cookies")) {
     $params = session_get_cookie_params();
     setcookie(
@@ -28,12 +31,14 @@ if (ini_get("session.use_cookies")) {
         time() - 42000,
         $params["path"],
         $params["domain"],
-        (bool) $params["secure"],
-        (bool) $params["httponly"]
+        $params["secure"],
+        $params["httponly"]
     );
 }
 
+// Destroy the session on the server.
 session_destroy();
 
+// Redirect to the login/home page.
 header("Location: index.php");
 exit();
