@@ -1,15 +1,7 @@
 <?php
 /* =========================================================
    itinerary-builder.php
-   "Manage trip" page: shows stops (cities) + their activities
-   for one trip, lets you delete a stop or a single activity.
-   Fixed: old version used tables "trips/stops/activities"
-   which don't exist. Now uses the real schema:
-   TRIP -> TRIP_STOP (+CITY/COUNTRY) -> ITINERARY (+ACTIVITY).
-   Adding new stops/activities is done on city-search.php and
-   activity-search.php (already write to TRIP_STOP / ITINERARY
-   correctly) - linked from here instead of duplicating insert
-   logic in a second place.
+   "Manage trip" page: shows stops (cities) + their activities.
    ========================================================= */
 session_start();
 include 'includes/db-connect.php';
@@ -26,7 +18,6 @@ if ($trip_id <= 0) {
     exit;
 }
 
-// Fetch the trip, making sure it belongs to this user
 $stmt = $conn->prepare("SELECT Trip_ID, Trip_Name, Start_Date, End_Date FROM TRIP WHERE Trip_ID = ? AND User_ID = ?");
 $stmt->bind_param("ii", $trip_id, $user_id);
 $stmt->execute();
@@ -41,11 +32,9 @@ if (!$trip) {
 $success_message = '';
 $error_message = '';
 
-// ----- Delete a stop (and its itinerary entries) -----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_stop'])) {
     $stop_id = (int) $_POST['stop_id'];
 
-    // ownership check via join
     $check = $conn->prepare("SELECT Stop_ID FROM TRIP_STOP WHERE Stop_ID = ? AND Trip_ID = ?");
     $check->bind_param("ii", $stop_id, $trip_id);
     $check->execute();
@@ -69,7 +58,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_stop'])) {
     }
 }
 
-// ----- Delete a single itinerary (activity) entry -----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_activity'])) {
     $itinerary_id = (int) $_POST['itinerary_id'];
 
@@ -82,7 +70,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_activity'])) {
     $success_message = 'Activity removed.';
 }
 
-// ----- Fetch stops for this trip (joined with CITY/COUNTRY) -----
 $sql_stops = "SELECT TRIP_STOP.Stop_ID, TRIP_STOP.Stop_Order, TRIP_STOP.Arrival_Date, TRIP_STOP.Departure_Date,
                      CITY.City_Name, COUNTRY.Country_Name
               FROM TRIP_STOP
@@ -101,7 +88,7 @@ while ($row = $result->fetch_assoc()) {
 }
 $stmt->close();
 
-// ----- Fetch activities (ITINERARY + ACTIVITY) for all stops in one query -----
+$trip_total_cost = 0;
 if (count($stops) > 0) {
     $stop_ids = implode(',', array_map('intval', array_keys($stops)));
     $sql_act = "SELECT ITINERARY.Itinerary_ID, ITINERARY.Stop_ID, ITINERARY.Activity_Date, ITINERARY.Activity_Cost,
@@ -113,6 +100,7 @@ if (count($stops) > 0) {
     $act_result = $conn->query($sql_act);
     while ($act = $act_result->fetch_assoc()) {
         $stops[$act['Stop_ID']]['activities'][] = $act;
+        $trip_total_cost += (float) $act['Activity_Cost'];
     }
 }
 
@@ -124,16 +112,29 @@ $active_page = 'my-trips';
 <meta charset="UTF-8">
 <title><?php echo htmlspecialchars($trip['Trip_Name']); ?> - Manage Itinerary - GlobeTrotter</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<style>
+.stop-order-stamp {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--ink); color: #fff;
+  font-family: 'Space Mono', monospace; font-size: 0.78rem; font-weight: 700;
+  margin-right: 8px;
+}
+.trip-total-strip {
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 18px; font-family: 'Space Mono', monospace; font-size: 0.85rem;
+  display: inline-flex; align-items: center; gap: 8px; color: var(--ink);
+}
+</style>
 </head>
 <body>
 <?php include 'includes/navbar.php'; ?>
 
 <div class="container py-5">
-<div class="d-flex justify-content-between align-items-center flex-wrap mb-2">
+<div class="d-flex justify-content-between align-items-center flex-wrap mb-2 gap-2">
 <h1 class="section-title mb-0"><i class="bi bi-map"></i> <?php echo htmlspecialchars($trip['Trip_Name']); ?></h1>
 <div class="d-flex gap-2">
 <a href="city-search.php" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle"></i> Add City</a>
@@ -141,18 +142,20 @@ $active_page = 'my-trips';
 </div>
 </div>
 
-<p class="text-muted mb-4">
+<p class="text-muted mb-2">
 <i class="bi bi-calendar3"></i>
 <?php echo date('d M Y', strtotime($trip['Start_Date'])); ?>
 &mdash;
 <?php echo date('d M Y', strtotime($trip['End_Date'])); ?>
 </p>
 
+<span class="trip-total-strip mb-4"><i class="bi bi-cash-coin"></i> Planned activity cost: ₹<?php echo number_format($trip_total_cost, 2); ?></span>
+
 <?php if ($success_message): ?>
-<div class="alert alert-success"><i class="bi bi-check-circle"></i> <?php echo htmlspecialchars($success_message); ?></div>
+<div class="alert alert-success mt-3"><i class="bi bi-check-circle"></i> <?php echo htmlspecialchars($success_message); ?></div>
 <?php endif; ?>
 <?php if ($error_message): ?>
-<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> <?php echo htmlspecialchars($error_message); ?></div>
+<div class="alert alert-danger mt-3"><i class="bi bi-exclamation-circle"></i> <?php echo htmlspecialchars($error_message); ?></div>
 <?php endif; ?>
 
 <?php if (count($stops) === 0): ?>
@@ -161,11 +164,12 @@ $active_page = 'my-trips';
 No stops added yet. Click "Add City" to start building your itinerary.
 </p>
 <?php else: ?>
+<div class="mt-4">
 <?php foreach ($stops as $stop): ?>
 <div class="timeline-day mb-4">
 <div class="d-flex justify-content-between align-items-start flex-wrap">
 <div>
-<h4><i class="bi bi-geo-alt"></i> <?php echo htmlspecialchars($stop['City_Name']); ?>
+<h4><span class="stop-order-stamp"><?php echo $stop['Stop_Order']; ?></span><?php echo htmlspecialchars($stop['City_Name']); ?>
 <small class="text-muted">, <?php echo htmlspecialchars($stop['Country_Name']); ?></small>
 </h4>
 <p class="text-muted small mb-2">
@@ -216,6 +220,7 @@ No stops added yet. Click "Add City" to start building your itinerary.
 <?php endif; ?>
 </div>
 <?php endforeach; ?>
+</div>
 <?php endif; ?>
 </div>
 
