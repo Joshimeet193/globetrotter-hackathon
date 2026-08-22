@@ -172,107 +172,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <!-- Bootstrap JavaScript -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <style>
-        /* ---- Page-only styles: boarding-pass split ticket layout ---- */
-        .ticket-wrap {
-            max-width: 920px;
-            margin: 56px auto;
-            display: flex;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 3px 0 rgba(27,42,65,0.05), 0 18px 40px rgba(27,42,65,0.14);
-            animation: fadeUp 0.55s ease both;
-            border: 1px solid var(--line);
-        }
-
-        .ticket-stub {
-            flex: 0 0 40%;
-            background: var(--ink);
-            color: #fff;
-            padding: 46px 36px;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            overflow: hidden;
-        }
-
-        .ticket-stub::before {
-            content: '';
-            position: absolute;
-            top: 0; bottom: 0; right: -1px;
-            width: 0;
-            border-right: 3px dashed rgba(255,255,255,0.18);
-        }
-
-        .ticket-stub h1 {
-            color: #fff;
-            font-size: 2.1rem;
-            line-height: 1.15;
-            margin-bottom: 14px;
-        }
-
-        .ticket-stub p.lede {
-            color: rgba(255,255,255,0.72);
-            font-size: 0.98rem;
-            max-width: 30ch;
-        }
-
-        .ticket-meta {
-            font-family: 'Space Mono', monospace;
-            font-size: 0.78rem;
-            color: rgba(255,255,255,0.55);
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            display: flex;
-            gap: 26px;
-            margin-top: 30px;
-        }
-
-        .ticket-meta div span {
-            display: block;
-            color: var(--gold);
-            font-size: 1rem;
-            letter-spacing: 0.02em;
-            margin-top: 2px;
-        }
-
-        .ticket-form {
-            flex: 1;
-            background: var(--card);
-            padding: 46px 40px;
-        }
-
-        .ticket-form .icon-circle {
-            margin-bottom: 6px;
-        }
-
-        @media (max-width: 767.98px) {
-            .ticket-wrap {
-                flex-direction: column;
-                margin: 20px auto;
-                border-radius: 14px;
-            }
-
-            .ticket-stub {
-                padding: 30px 26px;
-            }
-
-            .ticket-stub::before {
-                border-right: none;
-                border-bottom: 3px dashed rgba(255,255,255,0.18);
-                right: 0;
-                bottom: -1px;
-                top: auto;
-                height: 0;
-            }
-
-            .ticket-form {
-                padding: 30px 26px;
-            }
-        }
-    </style>
-
 </head>
 
 
@@ -372,7 +271,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 </div>
 
 
-                <div class="form-floating mb-3">
+                <div class="form-floating mb-3 password-field">
 
                     <input
                         type="password"
@@ -388,21 +287,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         Password
                     </label>
 
-                </div>
-
-
-                <div class="text-end mb-3">
-
-                    <a href="#" class="small">
-                        Forgot Password?
-                    </a>
+                    <button
+                        type="button"
+                        class="password-toggle-btn"
+                        data-toggle-for="password"
+                        aria-label="Show password"
+                        aria-pressed="false"
+                    >
+                        <i class="bi bi-eye"></i>
+                    </button>
 
                 </div>
 
 
                 <button
                     type="submit"
-                    class="btn btn-primary"
+                    class="btn btn-primary w-100"
                 >
                     <i class="bi bi-box-arrow-in-right me-2"></i>
                     Login
@@ -436,6 +336,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 </footer>
 
+
+<script>
+    document.querySelectorAll(".password-toggle-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            var input = document.getElementById(btn.getAttribute("data-toggle-for"));
+            var icon = btn.querySelector("i");
+            var showing = input.type === "text";
+
+            input.type = showing ? "password" : "text";
+            icon.classList.toggle("bi-eye", showing);
+            icon.classList.toggle("bi-eye-slash", !showing);
+            btn.setAttribute("aria-pressed", String(!showing));
+            btn.setAttribute("aria-label", showing ? "Show password" : "Hide password");
+        });
+    });
+</script>
 
 </body>
 
