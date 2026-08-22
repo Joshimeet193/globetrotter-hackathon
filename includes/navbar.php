@@ -49,10 +49,10 @@ city-search.php and activity-search.php.
 <a href="create-trip.php" class="btn btn-primary btn-sm">
 <i class="bi bi-plus-circle"></i> Plan New Trip
 </a>
-<span class="text-white-50 small d-none d-md-inline">
+<a href="profile.php" class="navbar-profile-link small d-none d-md-inline <?php echo ($active_page ?? '') === 'profile' ? 'active' : ''; ?>">
 <i class="bi bi-person-circle"></i>
 <?php echo htmlspecialchars($_SESSION['full_name'] ?? 'Traveler'); ?>
-</span>
+</a>
 <a href="logout.php" class="btn btn-outline-primary btn-sm">
 <i class="bi bi-box-arrow-right"></i> Logout
 </a>
