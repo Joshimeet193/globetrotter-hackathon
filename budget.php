@@ -1,8 +1,7 @@
 <?php
 // budget.php
-// Purpose: Show budget overview for a trip - the Budget limit set on the
-// TRIP table, all logged expenses (EXPENSE table), category-wise breakdown,
-// and a progress bar showing how much of the budget has been used.
+// Budget overview for a trip: total limit, expenses, category
+// breakdown, progress bar, plus estimated activity cost tie-in.
 
 session_start();
 include 'includes/db-connect.php';
@@ -21,7 +20,6 @@ if (!isset($_GET['trip_id'])) {
 
 $trip_id = intval($_GET['trip_id']);
 
-// Confirm trip belongs to this user
 $tripQuery = $conn->prepare("SELECT * FROM TRIP WHERE Trip_ID = ? AND User_ID = ?");
 $tripQuery->bind_param("ii", $trip_id, $user_id);
 $tripQuery->execute();
@@ -34,31 +32,32 @@ if ($tripResult->num_rows === 0) {
 
 $trip = $tripResult->fetch_assoc();
 
-// ---- Handle "Set/Update Budget Limit" form ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['budget_limit'])) {
     $budget_limit = floatval($_POST['budget_limit']);
-    $update = $conn->prepare("UPDATE TRIP SET Budget = ? WHERE Trip_ID = ? AND User_ID = ?");
-    $update->bind_param("dii", $budget_limit, $trip_id, $user_id);
-    $update->execute();
+    if ($budget_limit >= 0) {
+        $update = $conn->prepare("UPDATE TRIP SET Budget = ? WHERE Trip_ID = ? AND User_ID = ?");
+        $update->bind_param("dii", $budget_limit, $trip_id, $user_id);
+        $update->execute();
+    }
     header("Location: budget.php?trip_id=" . $trip_id);
     exit();
 }
 
-// ---- Handle "Add Expense" form ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_expense'])) {
     $expense_type = trim($_POST['expense_type']);
     $description = trim($_POST['description']);
     $amount = floatval($_POST['amount']);
     $expense_date = $_POST['expense_date'];
 
-    $insert = $conn->prepare("INSERT INTO EXPENSE (Trip_ID, Expense_Type, Description, Amount, Expense_Date) VALUES (?, ?, ?, ?, ?)");
-    $insert->bind_param("issds", $trip_id, $expense_type, $description, $amount, $expense_date);
-    $insert->execute();
+    if ($amount > 0 && $expense_date !== '') {
+        $insert = $conn->prepare("INSERT INTO EXPENSE (Trip_ID, Expense_Type, Description, Amount, Expense_Date) VALUES (?, ?, ?, ?, ?)");
+        $insert->bind_param("issds", $trip_id, $expense_type, $description, $amount, $expense_date);
+        $insert->execute();
+    }
     header("Location: budget.php?trip_id=" . $trip_id);
     exit();
 }
 
-// ---- Handle "Delete Expense" ----
 if (isset($_GET['delete_expense'])) {
     $expense_id = intval($_GET['delete_expense']);
     $del = $conn->prepare("DELETE FROM EXPENSE WHERE Expense_ID = ? AND Trip_ID = ?");
@@ -68,7 +67,6 @@ if (isset($_GET['delete_expense'])) {
     exit();
 }
 
-// ---- Fetch all expenses for this trip ----
 $expQuery = $conn->prepare("SELECT * FROM EXPENSE WHERE Trip_ID = ? ORDER BY Expense_Date DESC");
 $expQuery->bind_param("i", $trip_id);
 $expQuery->execute();
@@ -79,7 +77,6 @@ while ($row = $expResult->fetch_assoc()) {
     $expenses[] = $row;
 }
 
-// ---- Category-wise totals ----
 $categoryTotals = [];
 $total_spent = 0;
 foreach ($expenses as $exp) {
@@ -91,7 +88,6 @@ foreach ($expenses as $exp) {
     $total_spent += $exp['Amount'];
 }
 
-// ---- Also add up estimated activity costs from ITINERARY ----
 $activityEstQuery = $conn->prepare("
     SELECT COALESCE(SUM(i.Activity_Cost), 0) AS total_activity_est
     FROM ITINERARY i
@@ -106,16 +102,24 @@ $estimated_activity_cost = $activityEstResult['total_activity_est'];
 $budget_limit = $trip['Budget'] ? floatval($trip['Budget']) : 0;
 $percent_used = $budget_limit > 0 ? min(100, round(($total_spent / $budget_limit) * 100)) : 0;
 $is_over_budget = $budget_limit > 0 && $total_spent > $budget_limit;
+$budget_left = $budget_limit > 0 ? max(0, $budget_limit - $total_spent) : 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>Budget - <?php echo htmlspecialchars($trip['Trip_Name']); ?> | GlobeTrotter</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<style>
+.budget-stat { font-family: 'Space Mono', monospace; }
+.category-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0; border-bottom: 1px dashed var(--line);
+}
+.category-row:last-child { border-bottom: none; }
+</style>
 </head>
 <body>
 
@@ -136,7 +140,7 @@ $is_over_budget = $budget_limit > 0 && $total_spent > $budget_limit;
 <form method="POST" class="row g-2 align-items-center">
 <div class="col-auto flex-grow-1">
 <div class="form-floating">
-<input type="number" step="0.01" name="budget_limit" class="form-control"
+<input type="number" step="0.01" min="0" name="budget_limit" class="form-control"
 id="budgetLimit" placeholder="Enter total budget"
 value="<?php echo $budget_limit > 0 ? $budget_limit : ''; ?>" required>
 <label for="budgetLimit">Total Budget (₹)</label>
@@ -163,9 +167,9 @@ You are over budget! Total expenses exceed your set limit.
 <div class="card h-100">
 <div class="card-body">
 <h5 class="card-title"><i class="bi bi-pie-chart"></i> Overview</h5>
-<p class="mb-1">Total Spent: <strong>₹<?php echo number_format($total_spent, 2); ?></strong></p>
+<p class="mb-1 budget-stat">Total Spent: <strong>₹<?php echo number_format($total_spent, 2); ?></strong></p>
 <?php if ($budget_limit > 0): ?>
-<p class="text-muted mb-2">Budget Limit: ₹<?php echo number_format($budget_limit, 2); ?></p>
+<p class="text-muted mb-2 budget-stat">Budget Limit: ₹<?php echo number_format($budget_limit, 2); ?> &nbsp;·&nbsp; Left: ₹<?php echo number_format($budget_left, 2); ?></p>
 <div class="progress">
 <div class="progress-bar <?php echo $is_over_budget ? 'bg-over-budget' : ''; ?>"
 role="progressbar" style="width: <?php echo $percent_used; ?>%"
@@ -177,7 +181,7 @@ aria-valuenow="<?php echo $percent_used; ?>" aria-valuemin="0" aria-valuemax="10
 <p class="text-muted"><i class="bi bi-info-circle"></i> Set a total budget above to track your spending.</p>
 <?php endif; ?>
 <hr>
-<p class="mb-0 text-muted" style="font-size:0.9rem;">
+<p class="mb-0 text-muted budget-stat" style="font-size:0.9rem;">
 <i class="bi bi-stars"></i> Estimated cost of planned activities (from itinerary):
 <strong>₹<?php echo number_format($estimated_activity_cost, 2); ?></strong>
 </p>
@@ -193,10 +197,10 @@ aria-valuenow="<?php echo $percent_used; ?>" aria-valuemin="0" aria-valuemax="10
 <p class="text-muted">No expenses logged yet.</p>
 <?php else: ?>
 <?php foreach ($categoryTotals as $type => $amount): ?>
-<p>
-<i class="bi bi-tag"></i> <?php echo htmlspecialchars($type); ?>:
-<strong>₹<?php echo number_format($amount, 2); ?></strong>
-</p>
+<div class="category-row">
+<span><i class="bi bi-tag"></i> <?php echo htmlspecialchars($type); ?></span>
+<strong class="budget-stat">₹<?php echo number_format($amount, 2); ?></strong>
+</div>
 <?php endforeach; ?>
 <?php endif; ?>
 </div>
@@ -229,7 +233,7 @@ aria-valuenow="<?php echo $percent_used; ?>" aria-valuemin="0" aria-valuemax="10
 </div>
 <div class="col-md-2">
 <div class="form-floating">
-<input type="number" step="0.01" name="amount" class="form-control" id="expenseAmount" placeholder="Amount" required>
+<input type="number" step="0.01" min="0.01" name="amount" class="form-control" id="expenseAmount" placeholder="Amount" required>
 <label for="expenseAmount"><i class="bi bi-cash-coin"></i> Amount</label>
 </div>
 </div>
@@ -293,7 +297,6 @@ onclick="return confirm('Delete this expense?');">
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
 <script src="js/script.js"></script>
 </body>
 </html>
