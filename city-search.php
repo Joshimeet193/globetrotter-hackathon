@@ -135,16 +135,7 @@ sort($all_countries);
 
 <body>
 
-<!-- ===== NAVBAR ===== -->
-<nav class="navbar navbar-expand-lg">
-<div class="container">
-<a class="navbar-brand" href="dashboard.php">🌍 GlobeTrotter</a>
-<div class="d-flex">
-<a href="dashboard.php" class="btn btn-outline-primary btn-sm me-2"><i class="bi bi-house"></i> Dashboard</a>
-<a href="activity-search.php" class="btn btn-outline-primary btn-sm"><i class="bi bi-search"></i> Activity Search</a>
-</div>
-</div>
-</nav>
+<?php $active_page = 'city-search'; include 'includes/navbar.php'; ?>
 
 <div class="container my-4">
 
@@ -270,6 +261,7 @@ data-bs-toggle="modal" data-bs-target="#addModal<?php echo $city['City_ID']; ?>"
 
 <footer><p>Made with <span>❤️</span> for GlobeTrotter Hackathon</p></footer>
 
+<script src="js/script.js"></script>
 </body>
 
 </html>
