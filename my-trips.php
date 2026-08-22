@@ -183,9 +183,9 @@ value="<?php echo htmlspecialchars($search_term); ?>">
 <?php foreach ($trips as $trip): ?>
 <?php
 $status_badge = [
-    'upcoming' => ['label' => 'Upcoming', 'class' => 'bg-secondary'],
-    'ongoing'  => ['label' => 'Ongoing',  'class' => 'bg-success'],
-    'past'     => ['label' => 'Past',     'class' => 'bg-outline-primary'],
+    'upcoming' => ['label' => 'Upcoming', 'class' => 'status-upcoming'],
+    'ongoing'  => ['label' => 'Ongoing',  'class' => 'status-ongoing'],
+    'past'     => ['label' => 'Past',     'class' => 'status-past'],
 ][$trip['status']];
 ?>
 <div class="col-md-6 col-lg-4">
@@ -193,7 +193,7 @@ $status_badge = [
 <div class="position-relative">
 <img src="<?php echo !empty($trip['Cover_Photo']) ? htmlspecialchars($trip['Cover_Photo']) : 'https://placehold.co/400x300?text=' . urlencode($trip['Trip_Name']); ?>"
      class="card-img-top" alt="<?php echo htmlspecialchars($trip['Trip_Name']); ?>">
-<span class="badge <?php echo $status_badge['class']; ?> position-absolute top-0 end-0 m-2">
+<span class="badge-custom <?php echo $status_badge['class']; ?> position-absolute top-0 end-0 m-2">
 <?php echo $status_badge['label']; ?>
 </span>
 </div>
