@@ -1,10 +1,13 @@
 <?php
 // itinerary-view.php
-// Purpose: Show the full itinerary of a trip - stops grouped with their activities
+// Purpose: Show the full itinerary of a trip - stops (cities) in order,
+// with the activities scheduled for each stop (from ITINERARY + ACTIVITY tables)
 session_start();
 include 'includes/db-connect.php';
 
 // Make sure user is logged in
+// NOTE: confirm with Jay that login sets $_SESSION['user_id'] (lowercase) -
+// if he used a different session key name, change it here to match.
 if (!isset($_SESSION['user_id'])) {
     header("Location: index.php");
     exit();
@@ -19,7 +22,7 @@ if (!isset($_GET['trip_id'])) {
 $trip_id = intval($_GET['trip_id']);
 
 // Fetch trip details (and confirm it belongs to this user)
-$tripQuery = $conn->prepare("SELECT * FROM trips WHERE trip_id = ? AND user_id = ?");
+$tripQuery = $conn->prepare("SELECT * FROM TRIP WHERE Trip_ID = ? AND User_ID = ?");
 $tripQuery->bind_param("ii", $trip_id, $user_id);
 $tripQuery->execute();
 $tripResult = $tripQuery->get_result();
@@ -29,8 +32,16 @@ if ($tripResult->num_rows === 0) {
 }
 $trip = $tripResult->fetch_assoc();
 
-// Fetch all stops (cities) for this trip, ordered by start_date
-$stopsQuery = $conn->prepare("SELECT * FROM stops WHERE trip_id = ? ORDER BY start_date ASC");
+// Fetch all stops (cities) for this trip, ordered by Stop_Order
+// Join with CITY and COUNTRY to get names
+$stopsQuery = $conn->prepare("
+    SELECT ts.*, c.City_Name, c.Image AS City_Image, co.Country_Name
+    FROM TRIP_STOP ts
+    INNER JOIN CITY c ON ts.City_ID = c.City_ID
+    INNER JOIN COUNTRY co ON c.Country_ID = co.Country_ID
+    WHERE ts.Trip_ID = ?
+    ORDER BY ts.Stop_Order ASC
+");
 $stopsQuery->bind_param("i", $trip_id);
 $stopsQuery->execute();
 $stopsResult = $stopsQuery->get_result();
@@ -40,25 +51,31 @@ while ($row = $stopsResult->fetch_assoc()) {
     $stops[] = $row;
 }
 
-// For each stop, fetch its activities
+// For each stop, fetch its scheduled itinerary items (joined with ACTIVITY)
 foreach ($stops as $index => $stop) {
-    $actQuery = $conn->prepare("SELECT * FROM activities WHERE stop_id = ?");
-    $actQuery->bind_param("i", $stop['stop_id']);
-    $actQuery->execute();
-    $actResult = $actQuery->get_result();
+    $itinQuery = $conn->prepare("
+        SELECT i.*, a.Activity_Name, a.Activity_Type, a.Duration
+        FROM ITINERARY i
+        INNER JOIN ACTIVITY a ON i.Activity_ID = a.Activity_ID
+        WHERE i.Stop_ID = ?
+        ORDER BY i.Activity_Date ASC, i.Start_Time ASC
+    ");
+    $itinQuery->bind_param("i", $stop['Stop_ID']);
+    $itinQuery->execute();
+    $itinResult = $itinQuery->get_result();
 
-    $activities = [];
-    while ($a = $actResult->fetch_assoc()) {
-        $activities[] = $a;
+    $items = [];
+    while ($item = $itinResult->fetch_assoc()) {
+        $items[] = $item;
     }
-    $stops[$index]['activities'] = $activities;
+    $stops[$index]['itinerary_items'] = $items;
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Itinerary - <?php echo htmlspecialchars($trip['trip_name']); ?> | GlobeTrotter</title>
+    <title>Itinerary - <?php echo htmlspecialchars($trip['Trip_Name']); ?> | GlobeTrotter</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -81,14 +98,14 @@ foreach ($stops as $index => $stop) {
 <div class="container py-section">
 
     <!-- Trip Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <div>
-            <h2><i class="bi bi-map text-primary-custom"></i> <?php echo htmlspecialchars($trip['trip_name']); ?></h2>
-            <p class="text-muted">
+            <h2><i class="bi bi-map text-primary-custom"></i> <?php echo htmlspecialchars($trip['Trip_Name']); ?></h2>
+            <p class="text-muted mb-0">
                 <i class="bi bi-calendar3"></i>
-                <?php echo date("d M Y", strtotime($trip['start_date'])); ?>
+                <?php echo date("d M Y", strtotime($trip['Start_Date'])); ?>
                 &nbsp;→&nbsp;
-                <?php echo date("d M Y", strtotime($trip['end_date'])); ?>
+                <?php echo date("d M Y", strtotime($trip['End_Date'])); ?>
             </p>
         </div>
         <div>
@@ -101,8 +118,8 @@ foreach ($stops as $index => $stop) {
         </div>
     </div>
 
-    <?php if ($trip['description']): ?>
-        <p class="mb-4"><?php echo htmlspecialchars($trip['description']); ?></p>
+    <?php if ($trip['Description']): ?>
+        <p class="mb-4"><?php echo htmlspecialchars($trip['Description']); ?></p>
     <?php endif; ?>
 
     <!-- Itinerary Timeline -->
@@ -119,37 +136,50 @@ foreach ($stops as $index => $stop) {
             <div class="timeline-day">
                 <h5>
                     <i class="bi bi-geo-alt-fill text-primary-custom"></i>
-                    <?php echo htmlspecialchars($stop['city_name']); ?>,
-                    <?php echo htmlspecialchars($stop['country']); ?>
+                    Stop <?php echo $stop['Stop_Order']; ?>:
+                    <?php echo htmlspecialchars($stop['City_Name']); ?>,
+                    <?php echo htmlspecialchars($stop['Country_Name']); ?>
                 </h5>
                 <p class="text-muted mb-2">
                     <i class="bi bi-calendar-event"></i>
-                    <?php echo date("d M", strtotime($stop['start_date'])); ?>
+                    <?php echo date("d M", strtotime($stop['Arrival_Date'])); ?>
                     -
-                    <?php echo date("d M", strtotime($stop['end_date'])); ?>
+                    <?php echo date("d M", strtotime($stop['Departure_Date'])); ?>
                 </p>
 
-                <?php if (count($stop['activities']) === 0): ?>
-                    <p class="text-muted"><i class="bi bi-dash-circle"></i> No activities added for this stop.</p>
+                <?php if (count($stop['itinerary_items']) === 0): ?>
+                    <p class="text-muted"><i class="bi bi-dash-circle"></i> No activities scheduled for this stop yet.</p>
                 <?php else: ?>
                     <div class="row">
-                        <?php foreach ($stop['activities'] as $activity): ?>
+                        <?php foreach ($stop['itinerary_items'] as $item): ?>
                             <div class="col-md-4 mb-3">
                                 <div class="card h-100">
                                     <div class="card-body">
                                         <span class="badge-custom">
-                                            <?php echo htmlspecialchars($activity['category']); ?>
+                                            <?php echo htmlspecialchars($item['Activity_Type']); ?>
                                         </span>
                                         <h6 class="card-title mt-2">
                                             <i class="bi bi-stars"></i>
-                                            <?php echo htmlspecialchars($activity['activity_name']); ?>
+                                            <?php echo htmlspecialchars($item['Activity_Name']); ?>
                                         </h6>
                                         <p class="card-text mb-1">
-                                            <i class="bi bi-clock"></i> <?php echo htmlspecialchars($activity['duration']); ?>
+                                            <i class="bi bi-calendar-date"></i>
+                                            <?php echo date("d M", strtotime($item['Activity_Date'])); ?>
+                                            <?php if ($item['Start_Time']): ?>
+                                                &nbsp;•&nbsp;<i class="bi bi-clock"></i> <?php echo date("h:i A", strtotime($item['Start_Time'])); ?>
+                                            <?php endif; ?>
+                                        </p>
+                                        <p class="card-text mb-1">
+                                            <i class="bi bi-hourglass-split"></i> <?php echo htmlspecialchars($item['Duration']); ?> hrs
                                         </p>
                                         <p class="card-text">
-                                            <i class="bi bi-cash-coin"></i> ₹<?php echo number_format($activity['cost'], 2); ?>
+                                            <i class="bi bi-cash-coin"></i> ₹<?php echo number_format($item['Activity_Cost'], 2); ?>
                                         </p>
+                                        <?php if ($item['Notes']): ?>
+                                            <p class="card-text text-muted" style="font-size:0.8rem;">
+                                                <i class="bi bi-chat-left-text"></i> <?php echo htmlspecialchars($item['Notes']); ?>
+                                            </p>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </div>
