@@ -1,89 +1,99 @@
 <?php
 // =====================================================
 // activity-search.php
-// Activities search + filter page. Activities static array
-// ma hardcoded chhe. "Add to Trip" click karta activities
-// table ma row insert thay chhe (ek stop sathe linked).
+// Activities search + filter page.
+// HAVE REAL ACTIVITY table chhe (city-wise), etle hardcoded
+// array nathi vaparyu. "Add to Trip" click karta ITINERARY
+// table ma row insert thay chhe (ek existing stop sathe linked).
 // Quick View button e activity ni details modal ma batave chhe.
 // =====================================================
 
 session_start();
 include 'includes/db-connect.php';
 
-// Login check
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit();
 }
 $user_id = $_SESSION['user_id'];
 
-// -----------------------------------------------------
-// STEP A: Static activities data (hardcoded array)
-// Har activity ma: name, category, cost, duration(hours), description
-// -----------------------------------------------------
-$all_activities = [
-    ["name" => "Beach Parasailing",       "category" => "adventure",   "cost" => 1500, "duration" => 1,  "description" => "Fly above the water attached to a parachute towed by a boat. Great views and a big adrenaline rush."],
-    ["name" => "Snorkeling Tour",         "category" => "adventure",   "cost" => 1200, "duration" => 2,  "description" => "Explore colorful coral reefs and marine life just below the surface with a guided group."],
-    ["name" => "Scuba Diving",            "category" => "adventure",   "cost" => 3500, "duration" => 3,  "description" => "Certified instructor takes you deep underwater to explore reefs and sometimes shipwrecks."],
-    ["name" => "Trekking Trail",          "category" => "adventure",   "cost" => 800,  "duration" => 4,  "description" => "A guided hike through scenic hills and forest trails, suitable for beginners and pros alike."],
-    ["name" => "Paragliding",             "category" => "adventure",   "cost" => 2500, "duration" => 1,  "description" => "Soar over valleys and mountains with a trained tandem pilot. No experience required."],
-    ["name" => "City Heritage Walk",      "category" => "sightseeing", "cost" => 300,  "duration" => 2,  "description" => "A guided walking tour through the old city covering historic monuments and local stories."],
-    ["name" => "Museum Visit",            "category" => "sightseeing", "cost" => 200,  "duration" => 2,  "description" => "Explore art, history, and culture at one of the city's most famous museums."],
-    ["name" => "Sunset Point Tour",       "category" => "sightseeing", "cost" => 0,    "duration" => 1,  "description" => "Visit the city's best viewpoint to watch a breathtaking sunset over the landscape."],
-    ["name" => "Palace / Fort Tour",      "category" => "sightseeing", "cost" => 500,  "duration" => 3,  "description" => "Guided tour of a historic palace or fort, including architecture and royal history."],
-    ["name" => "Boat Cruise",             "category" => "sightseeing", "cost" => 1000, "duration" => 2,  "description" => "Relaxing boat ride along the coastline or river with scenic views and light refreshments."],
-    ["name" => "Street Food Walk",        "category" => "food",        "cost" => 600,  "duration" => 2,  "description" => "Taste the best local street food with a guide who knows all the hidden gems."],
-    ["name" => "Wine / Vineyard Tasting", "category" => "food",        "cost" => 1800, "duration" => 3,  "description" => "Sample local wines at a vineyard, including a tour of the cellar and production process."],
-    ["name" => "Cooking Class",           "category" => "food",        "cost" => 1200, "duration" => 3,  "description" => "Hands-on class where you learn to cook authentic local dishes from a professional chef."],
-    ["name" => "Fine Dining Experience",  "category" => "food",        "cost" => 2500, "duration" => 2,  "description" => "A multi-course meal at a top-rated local restaurant, often with a scenic view."],
-    ["name" => "Rooftop Cafe Hopping",    "category" => "food",        "cost" => 900,  "duration" => 2,  "description" => "Visit a few of the city's best rooftop cafes for coffee, snacks, and skyline views."],
-    ["name" => "Desert Safari",           "category" => "adventure",   "cost" => 2800, "duration" => 4,  "description" => "Dune bashing, camel rides, and a traditional dinner under the stars in the desert."],
-    ["name" => "Local Market Tour",       "category" => "sightseeing", "cost" => 100,  "duration" => 1,  "description" => "Wander through vibrant local markets to shop for souvenirs, spices, and handicrafts."],
-    ["name" => "Kayaking",                "category" => "adventure",   "cost" => 1000, "duration" => 2,  "description" => "Paddle through calm backwaters or coastline at your own pace, no experience needed."],
-    ["name" => "Night Market Food Tour",  "category" => "food",        "cost" => 700,  "duration" => 2,  "description" => "Explore a bustling night market and sample a variety of local snacks and dishes."],
-    ["name" => "Photography Walk",        "category" => "sightseeing", "cost" => 400,  "duration" => 2,  "description" => "A guided walk to the city's most photogenic spots, great for travel photography lovers."],
+// Category-wise icon (Activity_Type free text chhe database ma, etle
+// jo koi naya type hoy to default icon use thase)
+$type_icons = [
+    'sightseeing' => 'bi-binoculars',
+    'food'        => 'bi-cup-hot',
+    'adventure'   => 'bi-lightning-charge',
 ];
+function type_icon($type) {
+    global $type_icons;
+    return $type_icons[strtolower($type)] ?? 'bi-stars'; // default icon agar type match na thay
+}
 
 // -----------------------------------------------------
-// STEP B: Handle "Add to Trip" form (POST) - insert into activities table
+// STEP A: Handle "Add to Trip" form (POST) - ITINERARY table ma insert
 // -----------------------------------------------------
 $success_message = "";
 $error_message = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_activity'])) {
-    $stop_id        = $_POST['stop_id'];
-    $activity_name  = $_POST['activity_name'];
-    $category       = $_POST['category'];
-    $cost           = $_POST['cost'];
-    $duration       = $_POST['duration'];
+    $stop_id        = (int) $_POST['stop_id'];
+    $activity_id    = (int) $_POST['activity_id'];
+    $activity_date  = $_POST['activity_date'];
+    $activity_cost  = $_POST['activity_cost'];
 
     if (empty($stop_id)) {
         $error_message = "Please select a trip stop first!";
     } else {
-        $sql_insert = "INSERT INTO activities (stop_id, activity_name, category, cost, duration) 
-                       VALUES (?, ?, ?, ?, ?)";
-        $stmt = $conn->prepare($sql_insert);
-        // "i" = integer(stop_id), "s"=string(name), "s"=string(category), "d"=decimal(cost), "i"=integer(duration)
-        $stmt->bind_param("issdi", $stop_id, $activity_name, $category, $cost, $duration);
-
-        if ($stmt->execute()) {
-            $success_message = htmlspecialchars($activity_name) . " added to your trip!";
-        } else {
-            $error_message = "Something went wrong. Please try again.";
-        }
+        // Security check: e stop khareki logged-in user ni j trip no chhe ke nai
+        $sql_check = "SELECT TRIP_STOP.Stop_ID 
+                      FROM TRIP_STOP 
+                      JOIN TRIP ON TRIP_STOP.Trip_ID = TRIP.Trip_ID 
+                      WHERE TRIP_STOP.Stop_ID = ? AND TRIP.User_ID = ?";
+        $stmt = $conn->prepare($sql_check);
+        $stmt->bind_param("ii", $stop_id, $user_id);
+        $stmt->execute();
+        $owns_stop = $stmt->get_result()->num_rows > 0;
         $stmt->close();
+
+        if (!$owns_stop) {
+            $error_message = "Invalid trip stop selected.";
+        } else {
+            $sql_insert = "INSERT INTO ITINERARY (Stop_ID, Activity_ID, Activity_Date, Activity_Cost) 
+                           VALUES (?, ?, ?, ?)";
+            $stmt = $conn->prepare($sql_insert);
+            $stmt->bind_param("iisd", $stop_id, $activity_id, $activity_date, $activity_cost);
+
+            if ($stmt->execute()) {
+                $success_message = "Activity added to your itinerary!";
+            } else {
+                $error_message = "Something went wrong. Please try again.";
+            }
+            $stmt->close();
+        }
     }
 }
 
 // -----------------------------------------------------
-// STEP C: User na stops lavo (dropdown mate) - joined with trips
-// jethi dropdown ma "Trip Name - City Name" dekhaay
+// STEP B: Badhi activities DB mathi lavo (ACTIVITY + CITY joined)
 // -----------------------------------------------------
-$sql_stops = "SELECT stops.stop_id, stops.city_name, trips.trip_name 
-              FROM stops 
-              JOIN trips ON stops.trip_id = trips.trip_id 
-              WHERE trips.user_id = ? 
-              ORDER BY stops.stop_id DESC";
+$sql_activities = "SELECT ACTIVITY.Activity_ID, ACTIVITY.Activity_Name, ACTIVITY.Activity_Type, 
+                          ACTIVITY.Description, ACTIVITY.Duration, ACTIVITY.Estimated_Cost, ACTIVITY.Image,
+                          CITY.City_ID, CITY.City_Name
+                   FROM ACTIVITY
+                   JOIN CITY ON ACTIVITY.City_ID = CITY.City_ID
+                   ORDER BY ACTIVITY.Activity_Name";
+$all_activities = $conn->query($sql_activities)->fetch_all(MYSQLI_ASSOC);
+
+// -----------------------------------------------------
+// STEP C: User na badha stops lavo (dropdown mate) - trip + city naam sathe
+// Aa list pachi thi per-activity filter thashe (matching City_ID)
+// -----------------------------------------------------
+$sql_stops = "SELECT TRIP_STOP.Stop_ID, TRIP_STOP.City_ID, TRIP.Trip_Name, CITY.City_Name
+              FROM TRIP_STOP
+              JOIN TRIP ON TRIP_STOP.Trip_ID = TRIP.Trip_ID
+              JOIN CITY ON TRIP_STOP.City_ID = CITY.City_ID
+              WHERE TRIP.User_ID = ?
+              ORDER BY TRIP_STOP.Stop_ID DESC";
 $stmt = $conn->prepare($sql_stops);
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
@@ -91,27 +101,24 @@ $user_stops = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
 // -----------------------------------------------------
-// STEP D: Filters (GET request)
+// STEP D: Filters (GET request) - PHP ma j filter karo
 // -----------------------------------------------------
 $filter_category = $_GET['category'] ?? '';
-$min_cost         = isset($_GET['min_cost']) && $_GET['min_cost'] !== '' ? (float)$_GET['min_cost'] : null;
-$max_cost         = isset($_GET['max_cost']) && $_GET['max_cost'] !== '' ? (float)$_GET['max_cost'] : null;
-$filter_duration  = $_GET['duration'] ?? '';
+$min_cost        = isset($_GET['min_cost']) && $_GET['min_cost'] !== '' ? (float) $_GET['min_cost'] : null;
+$max_cost        = isset($_GET['max_cost']) && $_GET['max_cost'] !== '' ? (float) $_GET['max_cost'] : null;
+$filter_duration = $_GET['duration'] ?? '';
 
 $filtered_activities = array_filter($all_activities, function ($activity) use ($filter_category, $min_cost, $max_cost, $filter_duration) {
-    $matches_category = empty($filter_category) || $activity['category'] === $filter_category;
-    $matches_min       = is_null($min_cost) || $activity['cost'] >= $min_cost;
-    $matches_max       = is_null($max_cost) || $activity['cost'] <= $max_cost;
-    $matches_duration  = empty($filter_duration) || $activity['duration'] == $filter_duration;
+    $matches_category = empty($filter_category) || strtolower($activity['Activity_Type']) === strtolower($filter_category);
+    $matches_min       = is_null($min_cost) || $activity['Estimated_Cost'] >= $min_cost;
+    $matches_max       = is_null($max_cost) || $activity['Estimated_Cost'] <= $max_cost;
+    $matches_duration  = empty($filter_duration) || (float) $activity['Duration'] == (float) $filter_duration;
     return $matches_category && $matches_min && $matches_max && $matches_duration;
 });
 
-// Category mujab kayo Bootstrap icon vaparvo (standard bootstrap-icons, custom color nathi)
-$category_icon = [
-    "sightseeing" => "bi-binoculars",
-    "food"        => "bi-cup-hot",
-    "adventure"   => "bi-lightning-charge",
-];
+// Category dropdown DB ma je actually types chhe tena parthi j banavo (hardcoded nahi)
+$all_types = array_unique(array_column($all_activities, 'Activity_Type'));
+sort($all_types);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -154,9 +161,11 @@ $category_icon = [
             <label class="form-label">Category</label>
             <select name="category" class="form-select">
                 <option value="">All Categories</option>
-                <option value="sightseeing" <?php echo $filter_category === 'sightseeing' ? 'selected' : ''; ?>>Sightseeing</option>
-                <option value="food" <?php echo $filter_category === 'food' ? 'selected' : ''; ?>>Food</option>
-                <option value="adventure" <?php echo $filter_category === 'adventure' ? 'selected' : ''; ?>>Adventure</option>
+                <?php foreach ($all_types as $type): ?>
+                    <option value="<?php echo htmlspecialchars($type); ?>" <?php echo (strtolower($filter_category) === strtolower($type)) ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars(ucfirst($type)); ?>
+                    </option>
+                <?php endforeach; ?>
             </select>
         </div>
         <div class="col-md-2">
@@ -189,83 +198,101 @@ $category_icon = [
                 <div class="alert alert-warning">No activities match your filters. Try adjusting them.</div>
             </div>
         <?php else: ?>
-            <?php foreach ($filtered_activities as $index => $activity): ?>
+            <?php foreach ($filtered_activities as $activity): ?>
+                <?php
+                // Aa activity ni city sathe match thata user na stops j dropdown ma dekhaadva
+                // (dusri city ma banela stop ma aa activity add na thai shake, logically)
+                $matching_stops = array_filter($user_stops, function ($stop) use ($activity) {
+                    return $stop['City_ID'] == $activity['City_ID'];
+                });
+                ?>
                 <div class="col-md-4 col-lg-3">
                     <div class="card h-100">
+                        <?php if (!empty($activity['Image'])): ?>
+                            <img src="<?php echo htmlspecialchars($activity['Image']); ?>" class="card-img-top" alt="<?php echo htmlspecialchars($activity['Activity_Name']); ?>">
+                        <?php endif; ?>
                         <div class="card-body">
                             <span class="badge bg-secondary mb-2">
-                                <i class="bi <?php echo $category_icon[$activity['category']]; ?>"></i>
-                                <?php echo ucfirst($activity['category']); ?>
+                                <i class="bi <?php echo type_icon($activity['Activity_Type']); ?>"></i>
+                                <?php echo htmlspecialchars(ucfirst($activity['Activity_Type'])); ?>
                             </span>
-                            <h5 class="card-title"><?php echo htmlspecialchars($activity['name']); ?></h5>
-                            <p class="card-text mb-1"><i class="bi bi-wallet2"></i> ₹<?php echo number_format($activity['cost']); ?></p>
-                            <p class="card-text mb-3"><i class="bi bi-clock"></i> <?php echo $activity['duration']; ?> hr(s)</p>
+                            <h5 class="card-title"><?php echo htmlspecialchars($activity['Activity_Name']); ?></h5>
+                            <p class="card-text mb-1"><i class="bi bi-geo-alt"></i> <?php echo htmlspecialchars($activity['City_Name']); ?></p>
+                            <p class="card-text mb-1"><i class="bi bi-wallet2"></i> ₹<?php echo number_format($activity['Estimated_Cost']); ?></p>
+                            <p class="card-text mb-3"><i class="bi bi-clock"></i> <?php echo rtrim(rtrim($activity['Duration'], '0'), '.'); ?> hr(s)</p>
 
                             <div class="d-flex gap-2">
                                 <!-- Quick View button - opens modal with full description -->
                                 <button type="button" class="btn btn-outline-primary btn-sm flex-fill"
-                                        data-bs-toggle="modal" data-bs-target="#viewModal<?php echo $index; ?>">
+                                        data-bs-toggle="modal" data-bs-target="#viewModal<?php echo $activity['Activity_ID']; ?>">
                                     <i class="bi bi-eye"></i> View
                                 </button>
 
-                                <!-- Add button - opens modal to select which trip-stop to add it to -->
-                                <?php if (count($user_stops) > 0): ?>
+                                <!-- Add button - only shown if user has a stop in this activity's city -->
+                                <?php if (count($matching_stops) > 0): ?>
                                     <button type="button" class="btn btn-primary btn-sm flex-fill"
-                                            data-bs-toggle="modal" data-bs-target="#addModal<?php echo $index; ?>">
+                                            data-bs-toggle="modal" data-bs-target="#addModal<?php echo $activity['Activity_ID']; ?>">
                                         <i class="bi bi-plus-circle"></i> Add
                                     </button>
                                 <?php endif; ?>
                             </div>
+                            <?php if (count($matching_stops) === 0): ?>
+                                <small class="d-block mt-2"><i class="bi bi-info-circle"></i> Add <?php echo htmlspecialchars($activity['City_Name']); ?> to a trip first.</small>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
 
                 <!-- ===== QUICK VIEW MODAL ===== -->
-                <div class="modal fade" id="viewModal<?php echo $index; ?>" tabindex="-1">
+                <div class="modal fade" id="viewModal<?php echo $activity['Activity_ID']; ?>" tabindex="-1">
                     <div class="modal-dialog">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title"><?php echo htmlspecialchars($activity['name']); ?></h5>
+                                <h5 class="modal-title"><?php echo htmlspecialchars($activity['Activity_Name']); ?></h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
-                                <p><?php echo htmlspecialchars($activity['description']); ?></p>
+                                <?php if (!empty($activity['Image'])): ?>
+                                    <img src="<?php echo htmlspecialchars($activity['Image']); ?>" class="img-fluid rounded mb-3" alt="<?php echo htmlspecialchars($activity['Activity_Name']); ?>">
+                                <?php endif; ?>
+                                <p><?php echo htmlspecialchars($activity['Description']); ?></p>
                                 <hr>
-                                <p class="mb-1"><i class="bi <?php echo $category_icon[$activity['category']]; ?>"></i> <strong>Category:</strong> <?php echo ucfirst($activity['category']); ?></p>
-                                <p class="mb-1"><i class="bi bi-wallet2"></i> <strong>Cost:</strong> ₹<?php echo number_format($activity['cost']); ?></p>
-                                <p class="mb-0"><i class="bi bi-clock"></i> <strong>Duration:</strong> <?php echo $activity['duration']; ?> hour(s)</p>
+                                <p class="mb-1"><i class="bi <?php echo type_icon($activity['Activity_Type']); ?>"></i> <strong>Category:</strong> <?php echo htmlspecialchars(ucfirst($activity['Activity_Type'])); ?></p>
+                                <p class="mb-1"><i class="bi bi-geo-alt"></i> <strong>City:</strong> <?php echo htmlspecialchars($activity['City_Name']); ?></p>
+                                <p class="mb-1"><i class="bi bi-wallet2"></i> <strong>Cost:</strong> ₹<?php echo number_format($activity['Estimated_Cost']); ?></p>
+                                <p class="mb-0"><i class="bi bi-clock"></i> <strong>Duration:</strong> <?php echo rtrim(rtrim($activity['Duration'], '0'), '.'); ?> hour(s)</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- ===== ADD TO TRIP MODAL ===== -->
-                <div class="modal fade" id="addModal<?php echo $index; ?>" tabindex="-1">
+                <!-- ===== ADD TO TRIP MODAL (only lists stops in the same city) ===== -->
+                <div class="modal fade" id="addModal<?php echo $activity['Activity_ID']; ?>" tabindex="-1">
                     <div class="modal-dialog">
                         <div class="modal-content">
                             <form method="POST">
                                 <div class="modal-header">
-                                    <h5 class="modal-title">Add "<?php echo htmlspecialchars($activity['name']); ?>" to Trip</h5>
+                                    <h5 class="modal-title">Add "<?php echo htmlspecialchars($activity['Activity_Name']); ?>" to Trip</h5>
                                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                 </div>
                                 <div class="modal-body">
-                                    <!-- Hidden fields carry the activity's static data along with the form -->
-                                    <input type="hidden" name="activity_name" value="<?php echo htmlspecialchars($activity['name']); ?>">
-                                    <input type="hidden" name="category" value="<?php echo htmlspecialchars($activity['category']); ?>">
-                                    <input type="hidden" name="cost" value="<?php echo $activity['cost']; ?>">
-                                    <input type="hidden" name="duration" value="<?php echo $activity['duration']; ?>">
+                                    <input type="hidden" name="activity_id" value="<?php echo $activity['Activity_ID']; ?>">
+                                    <input type="hidden" name="activity_cost" value="<?php echo $activity['Estimated_Cost']; ?>">
 
                                     <div class="mb-3">
-                                        <label class="form-label">Select Trip Stop</label>
+                                        <label class="form-label">Select Trip Stop (in <?php echo htmlspecialchars($activity['City_Name']); ?>)</label>
                                         <select name="stop_id" class="form-select" required>
                                             <option value="">-- Choose a stop --</option>
-                                            <?php foreach ($user_stops as $stop): ?>
-                                                <option value="<?php echo $stop['stop_id']; ?>">
-                                                    <?php echo htmlspecialchars($stop['trip_name']); ?> - <?php echo htmlspecialchars($stop['city_name']); ?>
+                                            <?php foreach ($matching_stops as $stop): ?>
+                                                <option value="<?php echo $stop['Stop_ID']; ?>">
+                                                    <?php echo htmlspecialchars($stop['Trip_Name']); ?> - <?php echo htmlspecialchars($stop['City_Name']); ?>
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>
-                                        <small><i class="bi bi-info-circle"></i> Don't see your city? Add it first from City Search.</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label"><i class="bi bi-calendar3"></i> Activity Date</label>
+                                        <input type="date" name="activity_date" class="form-control" required>
                                     </div>
                                 </div>
                                 <div class="modal-footer">
