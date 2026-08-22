@@ -368,6 +368,45 @@ a:hover {
   color: var(--secondary-color);
 }
 
+/* ===== Dashboard hero + stats ===== */
+.dashboard-hero {
+  background: linear-gradient(120deg, rgba(255,107,74,0.08), rgba(46,196,182,0.08));
+  border-radius: var(--card-radius);
+  padding: 32px;
+  animation: fadeUp 0.5s ease both;
+}
+
+.dashboard-hero-icon {
+  font-size: 5rem;
+  color: var(--accent-color);
+  opacity: 0.25;
+}
+
+.stat-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.stat-card .icon-circle {
+  margin-bottom: 8px;
+}
+
+.stat-card h3 {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  color: var(--secondary-color);
+}
+
+@media (max-width: 575.98px) {
+  .dashboard-hero {
+    padding: 22px;
+    text-align: center;
+  }
+
+  .dashboard-hero-icon {
+    display: none;
+  }
+}
+
 /* ===== Dashboard sections ===== */
 .section-title {
   font-weight: 600;
