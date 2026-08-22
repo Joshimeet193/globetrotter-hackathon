@@ -1,7 +1,37 @@
 <?php
 
-// Start the session
+// Secure session configuration
+$is_https = (
+    (!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off") ||
+    (isset($_SERVER["SERVER_PORT"]) && (int) $_SERVER["SERVER_PORT"] === 443)
+);
+
+session_set_cookie_params([
+    "lifetime" => 0,
+    "path" => "/",
+    "secure" => $is_https,
+    "httponly" => true,
+    "samesite" => "Lax"
+]);
+
 session_start();
+
+// Create a CSRF token for state-changing forms.
+if (empty($_SESSION["csrf_token"])) {
+    $_SESSION["csrf_token"] = bin2hex(random_bytes(32));
+}
+
+function validate_csrf_token(): bool
+{
+    return isset($_POST["csrf_token"], $_SESSION["csrf_token"])
+        && is_string($_POST["csrf_token"])
+        && hash_equals($_SESSION["csrf_token"], $_POST["csrf_token"]);
+}
+
+function text_length(string $value): int
+{
+    return function_exists("mb_strlen") ? mb_strlen($value, "UTF-8") : strlen($value);
+}
 
 // Include database connection
 require_once "includes/db-connect.php";
@@ -15,181 +45,105 @@ $message_type = "";
 
 
 // Check whether signup form was submitted
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    // Get values from form safely
-    $name = trim($_POST["name"] ?? "");
-    $email = trim($_POST["email"] ?? "");
-    $password = $_POST["password"] ?? "";
-
-
-    // =========================
-    // VALIDATION
-    // =========================
-
-    // Check empty fields
-    if (empty($name) || empty($email) || empty($password)) {
-
-        $message = "Please fill in all fields.";
+    // Reject forged submissions before doing any account work.
+    if (!validate_csrf_token()) {
+        $message = "Invalid request. Please refresh the page and try again.";
         $message_type = "danger";
-
-    }
-
-    // Check name length according to database
-    elseif (strlen($name) > 50) {
-
-        $message = "Name must not exceed 50 characters.";
-        $message_type = "danger";
-
-    }
-
-    // Check email length according to database
-    elseif (strlen($email) > 100) {
-
-        $message = "Email address must not exceed 100 characters.";
-        $message_type = "danger";
-
-    }
-
-    // Check valid email
-    elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-
-        $message = "Please enter a valid email address.";
-        $message_type = "danger";
-
-    }
-
-    // Check password length
-    elseif (strlen($password) < 6) {
-
-        $message = "Password must contain at least 6 characters.";
-        $message_type = "danger";
-
-    }
-
-    else {
+    } else {
+        // Get values from form safely.
+        $name = trim($_POST["name"] ?? "");
+        $email = trim($_POST["email"] ?? "");
+        $password = $_POST["password"] ?? "";
 
         // =========================
-        // CHECK EXISTING EMAIL
+        // VALIDATION
         // =========================
 
-        $sql = "SELECT User_ID
-                FROM USERS
-                WHERE Email = ?";
-
-        $stmt = $conn->prepare($sql);
-
-
-        // Check whether query preparation was successful
-        if ($stmt === false) {
-
-            $message = "Something went wrong. Please try again.";
+        if ($name === "" || $email === "" || $password === "") {
+            $message = "Please fill in all fields.";
             $message_type = "danger";
-
+        } elseif (text_length($name) > 50) {
+            $message = "Name must not exceed 50 characters.";
+            $message_type = "danger";
+        } elseif (text_length($email) > 100) {
+            $message = "Email address must not exceed 100 characters.";
+            $message_type = "danger";
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $message = "Please enter a valid email address.";
+            $message_type = "danger";
+        } elseif (strlen($password) < 8) {
+            $message = "Password must contain at least 8 characters.";
+            $message_type = "danger";
         } else {
+            // =========================
+            // CHECK EXISTING EMAIL
+            // =========================
 
-            $stmt->bind_param("s", $email);
+            $sql = "SELECT User_ID FROM USERS WHERE Email = ?";
+            $stmt = $conn->prepare($sql);
 
-
-            // Execute SELECT query
-            if (!$stmt->execute()) {
-
+            if ($stmt === false) {
                 $message = "Something went wrong. Please try again.";
                 $message_type = "danger";
-
             } else {
+                $stmt->bind_param("s", $email);
 
-                $stmt->store_result();
-
-
-                // If email already exists
-                if ($stmt->num_rows > 0) {
-
-                    $message = "An account with this email already exists.";
+                if (!$stmt->execute()) {
+                    $message = "Something went wrong. Please try again.";
                     $message_type = "danger";
+                } else {
+                    $stmt->store_result();
 
-                }
-
-                else {
-
-                    // =========================
-                    // HASH PASSWORD
-                    // =========================
-
-                    $hashed_password = password_hash(
-                        $password,
-                        PASSWORD_DEFAULT
-                    );
-
-
-                    // Check whether password hashing was successful
-                    if ($hashed_password === false) {
-
-                        $message = "Something went wrong. Please try again.";
+                    if ($stmt->num_rows > 0) {
+                        $message = "An account with this email already exists.";
                         $message_type = "danger";
-
                     } else {
-
                         // =========================
-                        // INSERT USER
+                        // HASH PASSWORD
                         // =========================
 
-                        $sql = "INSERT INTO USERS
-                                (Name, Email, Password)
-                                VALUES (?, ?, ?)";
+                        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-                        $insert_stmt = $conn->prepare($sql);
-
-
-                        // Check INSERT preparation
-                        if ($insert_stmt === false) {
-
+                        if ($hashed_password === false) {
                             $message = "Something went wrong. Please try again.";
                             $message_type = "danger";
-
                         } else {
+                            // =========================
+                            // INSERT USER
+                            // =========================
 
-                            $insert_stmt->bind_param(
-                                "sss",
-                                $name,
-                                $email,
-                                $hashed_password
-                            );
+                            $sql = "INSERT INTO USERS (Name, Email, Password) VALUES (?, ?, ?)";
+                            $insert_stmt = $conn->prepare($sql);
 
-
-                            // Execute INSERT query
-                            if ($insert_stmt->execute()) {
-
-                                $message = "Account created successfully! You can now login.";
-                                $message_type = "success";
-
+                            if ($insert_stmt === false) {
+                                $message = "Something went wrong. Please try again.";
+                                $message_type = "danger";
                             } else {
+                                $insert_stmt->bind_param("sss", $name, $email, $hashed_password);
 
-                                // Handle duplicate email race condition
-                                if ($conn->errno == 1062) {
-
-                                    $message = "An account with this email already exists.";
-
+                                if ($insert_stmt->execute()) {
+                                    $message = "Account created successfully! You can now login.";
+                                    $message_type = "success";
                                 } else {
-
-                                    $message = "Something went wrong. Please try again.";
-
+                                    // The UNIQUE constraint is the final protection against a race condition.
+                                    if ($conn->errno === 1062) {
+                                        $message = "An account with this email already exists.";
+                                    } else {
+                                        $message = "Something went wrong. Please try again.";
+                                    }
+                                    $message_type = "danger";
                                 }
 
-                                $message_type = "danger";
+                                $insert_stmt->close();
                             }
-
-
-                            // Close insert statement
-                            $insert_stmt->close();
                         }
                     }
                 }
+
+                $stmt->close();
             }
-
-
-            // Close select statement
-            $stmt->close();
         }
     }
 }
@@ -294,7 +248,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <?php } ?>
 
 
-                <?php echo htmlspecialchars($message); ?>
+                <?php echo htmlspecialchars($message, ENT_QUOTES, "UTF-8"); ?>
 
             </div>
 
@@ -304,6 +258,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <!-- Signup Form -->
 
         <form method="POST" action="">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION["csrf_token"], ENT_QUOTES, "UTF-8"); ?>">
 
 
             <!-- Full Name -->
@@ -316,6 +271,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     id="name"
                     name="name"
                     placeholder="Full Name"
+                    maxlength="50"
                     required
                 >
 
@@ -340,6 +296,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     id="email"
                     name="email"
                     placeholder="Email Address"
+                    maxlength="100"
                     required
                 >
 
@@ -364,7 +321,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     id="password"
                     name="password"
                     placeholder="Password"
-                    minlength="6"
+                    minlength="8"
                     required
                 >
 
@@ -385,7 +342,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                 <i class="bi bi-shield-check me-1"></i>
 
-                Password must be at least 6 characters.
+                Password must be at least 8 characters.
 
             </div>
 
