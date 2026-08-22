@@ -165,7 +165,7 @@ $trip_days = (strtotime($trip['End_Date']) - strtotime($trip['Start_Date'])) / 8
 <div class="card h-100">
 <div class="card-body">
 <span class="badge-custom">
-<?php echo htmlspecialchars($item['Activity_Type']); ?>
+<?php echo htmlspecialchars(ucfirst($item['Activity_Type'])); ?>
 </span>
 <h6 class="card-title mt-2">
 <i class="bi bi-stars"></i>
