@@ -3,12 +3,14 @@
 // dashboard.php
 // Logged-in user nu home page - welcome msg, recent trips
 // (with budget snapshot), "Plan New Trip" button, popular cities.
+// Aa file HAVE REAL DATABASE TABLES vapare chhe (CITY, TRIP, ITINERARY)
+// kem ke actual schema ma aa tables already banela chhe.
 // =====================================================
 
 session_start();
 include 'includes/db-connect.php';
 
-// Login check
+// Login check - session ma User_ID nathi to login page mokli do
 if (!isset($_SESSION['User_ID'])) {
     header("Location: index.php");
     exit();
@@ -17,7 +19,7 @@ if (!isset($_SESSION['User_ID'])) {
 $user_id = $_SESSION['User_ID'];
 
 // -----------------------------------------------------
-// STEP 1: User nu naam lavo
+// STEP 1: User nu naam lavo (table column nu naam "Name" chhe, "full_name" nahi)
 // -----------------------------------------------------
 $sql_user = "SELECT Name FROM USERS WHERE User_ID = ?";
 $stmt = $conn->prepare($sql_user);
@@ -28,7 +30,7 @@ $user_name = $user_data['Name'] ?? 'Traveler';
 $stmt->close();
 
 // -----------------------------------------------------
-// STEP 2: User na last 3 trips lavo
+// STEP 2: User na last 3 trips lavo (TRIP table mathi, Budget field sathe)
 // -----------------------------------------------------
 $sql_trips = "SELECT Trip_ID, Trip_Name, Start_Date, End_Date, Cover_Photo, Budget
               FROM TRIP
@@ -42,7 +44,7 @@ $recent_trips = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
 // -----------------------------------------------------
-// STEP 3: Har trip nu "spent so far" calculate karo
+// STEP 3: Har trip nu "spent so far" calculate karo (Budget highlight mate)
 // -----------------------------------------------------
 $sql_spent = "SELECT COALESCE(SUM(ITINERARY.Activity_Cost), 0) AS spent
               FROM ITINERARY
@@ -62,7 +64,7 @@ foreach ($recent_trips as $key => $trip) {
 $stmt->close();
 
 // -----------------------------------------------------
-// STEP 4: Popular cities
+// STEP 4: Popular cities - sabse popular 6 cities lavo
 // -----------------------------------------------------
 $sql_popular = "SELECT CITY.City_ID, CITY.City_Name, CITY.Image, COUNTRY.Country_Name
                 FROM CITY
@@ -73,18 +75,24 @@ $popular_cities = $conn->query($sql_popular)->fetch_all(MYSQLI_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dashboard - GlobeTrotter</title>
+
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
 </head>
+
 <body>
 
+<!-- ===== NAVBAR ===== -->
 <nav class="navbar navbar-expand-lg">
 <div class="container">
 <a class="navbar-brand" href="dashboard.php">🌍 GlobeTrotter</a>
@@ -99,6 +107,7 @@ $popular_cities = $conn->query($sql_popular)->fetch_all(MYSQLI_ASSOC);
 
 <div class="container my-4">
 
+<!-- ===== WELCOME SECTION ===== -->
 <div class="row mb-4">
 <div class="col-12">
 <h2 class="section-title">Welcome back, <?php echo htmlspecialchars($user_name); ?> <i class="bi bi-hand-thumbs-up"></i></h2>
@@ -107,6 +116,7 @@ $popular_cities = $conn->query($sql_popular)->fetch_all(MYSQLI_ASSOC);
 </div>
 </div>
 
+<!-- ===== RECENT TRIPS SECTION ===== -->
 <h3 class="section-title">Your Recent Trips</h3>
 <div class="row g-4 mb-5">
 <?php if (count($recent_trips) === 0): ?>
@@ -119,7 +129,9 @@ You haven't planned any trips yet. Click "Plan New Trip" to get started!
 <?php foreach ($recent_trips as $trip): ?>
 <div class="col-md-4">
 <div class="card h-100">
-<?php $photo = !empty($trip['Cover_Photo']) ? $trip['Cover_Photo'] : 'https://placehold.co/400x200?text=Trip'; ?>
+<?php
+$photo = !empty($trip['Cover_Photo']) ? $trip['Cover_Photo'] : 'https://placehold.co/400x200?text=Trip';
+?>
 <img src="<?php echo htmlspecialchars($photo); ?>" class="card-img-top" alt="<?php echo htmlspecialchars($trip['Trip_Name']); ?>">
 <div class="card-body">
 <h5 class="card-title"><?php echo htmlspecialchars($trip['Trip_Name']); ?></h5>
@@ -127,6 +139,8 @@ You haven't planned any trips yet. Click "Plan New Trip" to get started!
 <i class="bi bi-calendar3"></i>
 <?php echo htmlspecialchars($trip['Start_Date']); ?> to <?php echo htmlspecialchars($trip['End_Date']); ?>
 </p>
+
+<!-- ===== BUDGET HIGHLIGHT ===== -->
 <?php if ($trip['Budget'] > 0): ?>
 <p class="card-text mb-1">
 <i class="bi bi-wallet2"></i>
@@ -145,6 +159,7 @@ aria-valuenow="<?php echo $trip['percent_used']; ?>" aria-valuemin="0" aria-valu
 <?php else: ?>
 <p class="card-text mb-2"><i class="bi bi-wallet2"></i> No budget set for this trip</p>
 <?php endif; ?>
+
 <a href="itinerary-view.php?trip_id=<?php echo $trip['Trip_ID']; ?>" class="btn btn-outline-primary btn-sm">View Trip</a>
 </div>
 </div>
@@ -153,6 +168,7 @@ aria-valuenow="<?php echo $trip['percent_used']; ?>" aria-valuemin="0" aria-valu
 <?php endif; ?>
 </div>
 
+<!-- ===== POPULAR CITIES SECTION ===== -->
 <h3 class="section-title">Popular Destinations</h3>
 <div class="row g-4">
 <?php if (count($popular_cities) === 0): ?>
@@ -180,4 +196,5 @@ aria-valuenow="<?php echo $trip['percent_used']; ?>" aria-valuemin="0" aria-valu
 <footer><p>Made with <span>❤️</span> for GlobeTrotter Hackathon</p></footer>
 
 </body>
+
 </html>
