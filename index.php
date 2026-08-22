@@ -65,6 +65,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 // Store user information in session
                 $_SESSION["User_ID"] = $user["User_ID"];
                 $_SESSION["Name"] = $user["Name"];
+                $_SESSION["user_id"] = $user["User_ID"];   // alias: some pages check lowercase key
+                $_SESSION["full_name"] = $user["Name"];    // alias: navbar.php checks this key
 
 
                 // Redirect to dashboard
@@ -125,42 +127,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <body class="bg-cream">
 
 
-<!-- =========================
-     NAVBAR
-     ========================= -->
-
 <nav class="navbar navbar-expand-lg">
-
     <div class="container">
-
         <a class="navbar-brand" href="index.php">
             🌍 GlobeTrotter
         </a>
-
     </div>
-
 </nav>
 
-
-<!-- =========================
-     LOGIN FORM
-     ========================= -->
 
 <div class="container">
 
     <div class="auth-container">
 
-
-        <!-- Login Icon -->
-
         <div class="icon-circle mx-auto">
-
             <i class="bi bi-airplane"></i>
-
         </div>
-
-
-        <!-- Heading -->
 
         <h2>Welcome Back!</h2>
 
@@ -168,31 +150,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             Login to continue your journey
         </p>
 
-
-        <!-- Display Error Message -->
-
         <?php if (!empty($message)) { ?>
 
             <div class="alert alert-danger" role="alert">
-
                 <i class="bi bi-exclamation-circle me-2"></i>
-
                 <?php echo htmlspecialchars($message); ?>
-
             </div>
 
         <?php } ?>
 
-
-        <!-- Login Form -->
-
         <form method="POST" action="">
 
-
-            <!-- Email -->
-
             <div class="form-floating mb-3">
-
                 <input
                     type="email"
                     class="form-control"
@@ -201,22 +170,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     placeholder="Email Address"
                     required
                 >
-
                 <label for="email">
-
                     <i class="bi bi-envelope me-2"></i>
-
                     Email Address
-
                 </label>
-
             </div>
 
-
-            <!-- Password -->
-
             <div class="form-floating mb-3">
-
                 <input
                     type="password"
                     class="form-control"
@@ -225,74 +185,44 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     placeholder="Password"
                     required
                 >
-
                 <label for="password">
-
                     <i class="bi bi-lock me-2"></i>
-
                     Password
-
                 </label>
-
             </div>
 
-
-            <!-- Forgot Password -->
-
             <div class="text-end mb-3">
-
                 <a href="#" class="small">
                     Forgot Password?
                 </a>
-
             </div>
-
-
-            <!-- Login Button -->
 
             <button
                 type="submit"
                 class="btn btn-primary"
             >
-
                 <i class="bi bi-box-arrow-in-right me-2"></i>
-
                 Login
-
             </button>
-
 
         </form>
 
-
-        <!-- Signup Link -->
-
         <p class="text-center mt-4 mb-0">
-
             Don't have an account?
-
             <a href="signup.php">
                 Sign Up
             </a>
-
         </p>
-
 
     </div>
 
 </div>
 
 
-<!-- =========================
-     FOOTER
-     ========================= -->
-
 <footer>
-
     <p>
         Made with <span>❤️</span> for GlobeTrotter Hackathon
     </p>
-
 </footer>
 
 
