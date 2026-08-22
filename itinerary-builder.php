@@ -6,11 +6,11 @@
 session_start();
 include 'includes/db-connect.php';
 
-if (!isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['User_ID'])) {
     header('Location: index.php');
     exit;
 }
-$user_id = $_SESSION['user_id'];
+$user_id = $_SESSION['User_ID'];
 
 $trip_id = (int) ($_GET['trip_id'] ?? 0);
 if ($trip_id <= 0) {
