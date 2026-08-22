@@ -547,6 +547,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                             </a>
 
+
+                            <a
+                                href="logout.php"
+                                class="btn btn-outline-danger"
+                            >
+
+                                <i class="bi bi-box-arrow-right me-2"></i>
+
+                                Logout
+
+                            </a>
+
                         </div>
 
 
