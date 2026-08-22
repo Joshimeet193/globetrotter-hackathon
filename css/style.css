@@ -452,3 +452,26 @@ footer span { color: var(--stamp); }
   border: 1px solid var(--line) !important;
   pointer-events: auto !important;
 }
+
+/* =========================================================
+   FIX: Modal click-block bug
+   Root cause: the .fadeUp entrance animation on .row.g-4/.row.g-3
+   children (via `.container > *`) creates a CSS transform, which
+   pins any modal nested inside that row into a lower stacking
+   context. The dynamically-appended .modal-backdrop then paints
+   above the modal's own content and intercepts every click, even
+   though the modal is visually on top.
+   Fix: disable the entrance animation specifically on rows that
+   contain modals, so those rows don't create a stacking context.
+   ========================================================= */
+.row.g-4:has(.modal),
+.row.g-3:has(.modal) {
+  animation: none !important;
+  transform: none !important;
+}
+.row.g-4:has(.modal) > div,
+.row.g-3:has(.modal) > div {
+  animation: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+}
