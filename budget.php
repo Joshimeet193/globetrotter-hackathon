@@ -32,6 +32,8 @@ if ($tripResult->num_rows === 0) {
 
 $trip = $tripResult->fetch_assoc();
 
+$allowed_expense_types = ['Transport', 'Stay', 'Activity', 'Meals', 'Other'];
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['budget_limit'])) {
     $budget_limit = floatval($_POST['budget_limit']);
     if ($budget_limit >= 0) {
@@ -48,6 +50,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_expense'])) {
     $description = trim($_POST['description']);
     $amount = floatval($_POST['amount']);
     $expense_date = $_POST['expense_date'];
+
+    if (!in_array($expense_type, $allowed_expense_types, true)) {
+        $expense_type = 'Other';
+    }
 
     if ($amount > 0 && $expense_date !== '') {
         $insert = $conn->prepare("INSERT INTO EXPENSE (Trip_ID, Expense_Type, Description, Amount, Expense_Date) VALUES (?, ?, ?, ?, ?)");
