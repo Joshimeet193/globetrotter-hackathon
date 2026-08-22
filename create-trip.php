@@ -2,9 +2,6 @@
 /* =========================================================
    create-trip.php
    Form to create a new trip, linked to the logged-in user.
-   Fixed: was inserting into a "trips" table that doesn't
-   exist in the real schema. Now uses TRIP (User_ID, Trip_Name,
-   Start_Date, End_Date, Description, Cover_Photo, Budget).
    ========================================================= */
 session_start();
 include 'includes/db-connect.php';
@@ -28,6 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error_message = 'Please fill in trip name, start date and end date.';
     } elseif (strtotime($end_date) < strtotime($start_date)) {
         $error_message = 'End date cannot be before the start date.';
+    } elseif ($budget < 0) {
+        $error_message = 'Budget cannot be negative.';
     } else {
         if (isset($_FILES['cover_photo']) && $_FILES['cover_photo']['error'] === UPLOAD_ERR_OK) {
             $upload_dir = 'uploads/trip-covers/';
@@ -53,7 +52,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($stmt->execute()) {
             $new_trip_id = $stmt->insert_id;
             $stmt->close();
-            // Next step: user adds cities to this trip via City Search
             header('Location: city-search.php?trip_id=' . $new_trip_id);
             exit;
         } else {
@@ -70,10 +68,19 @@ $active_page = 'create-trip';
 <meta charset="UTF-8">
 <title>Plan New Trip - GlobeTrotter</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<style>
+.trip-form-card { position: relative; overflow: hidden; }
+.trip-form-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  background: repeating-linear-gradient(90deg, var(--gold) 0 10px, transparent 10px 18px);
+}
+.trip-days-hint {
+  font-family: 'Space Mono', monospace; font-size: 0.8rem; color: var(--teal);
+}
+</style>
 </head>
 <body>
 <?php include 'includes/navbar.php'; ?>
@@ -88,7 +95,7 @@ $active_page = 'create-trip';
 <div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> <?php echo htmlspecialchars($error_message); ?></div>
 <?php endif; ?>
 
-<div class="card">
+<div class="card trip-form-card">
 <div class="card-body">
 <form method="POST" enctype="multipart/form-data">
 <div class="form-floating mb-3">
@@ -114,6 +121,7 @@ $active_page = 'create-trip';
 </div>
 </div>
 </div>
+<p class="trip-days-hint mb-3" id="tripDaysHint"></p>
 
 <div class="form-floating mb-3">
 <input type="number" name="budget" id="budget" class="form-control" min="0" step="1"
@@ -147,5 +155,24 @@ $active_page = 'create-trip';
 <footer><p>Made with <span>❤️</span> for GlobeTrotter Hackathon</p></footer>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="js/script.js"></script>
+<script>
+// live "trip length" hint - pure UX sugar, no logic change
+(function () {
+  const start = document.getElementById('start_date');
+  const end = document.getElementById('end_date');
+  const hint = document.getElementById('tripDaysHint');
+  function update() {
+    if (start.value && end.value) {
+      const days = Math.round((new Date(end.value) - new Date(start.value)) / 86400000);
+      hint.textContent = days >= 0 ? '✈ ' + days + ' day trip' : '';
+    } else {
+      hint.textContent = '';
+    }
+  }
+  start.addEventListener('change', update);
+  end.addEventListener('change', update);
+  update();
+})();
+</script>
 </body>
 </html>
