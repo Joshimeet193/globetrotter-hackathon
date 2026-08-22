@@ -2,9 +2,6 @@
 // =====================================================
 // city-search.php
 // Cities search + filter page.
-// HAVE REAL CITY + COUNTRY tables chhe database ma, etle
-// hardcoded array nathi vaparyu - direct DB thi data lavo chhiye.
-// "Add to Trip" click karta TRIP_STOP table ma row insert thay chhe.
 // =====================================================
 
 session_start();
@@ -17,23 +14,15 @@ if (!isset($_SESSION['User_ID'])) {
 
 $user_id = $_SESSION['User_ID'];
 
-// -----------------------------------------------------
-// Cost_Index ek numeric decimal chhe (Low/Medium/High jevu enum nathi).
-// Etle apane j ek assumption ni scale banavi chhe cost ne "Low/Medium/High"
-// batavva mate.
-// -----------------------------------------------------
-define('COST_LOW_MAX', 40); // Cost_Index <= 40 => Low
-define('COST_MEDIUM_MAX', 80); // Cost_Index 41-80 => Medium, 80+ => High
+define('COST_LOW_MAX', 40);
+define('COST_MEDIUM_MAX', 80);
 
 function cost_label($cost_index) {
-    if ($cost_index <= COST_LOW_MAX) return ['label' => 'Low', 'class' => 'bg-success'];
-    if ($cost_index <= COST_MEDIUM_MAX) return ['label' => 'Medium', 'class' => 'bg-warning text-dark'];
-    return ['label' => 'High', 'class' => 'bg-danger'];
+    if ($cost_index <= COST_LOW_MAX) return ['label' => 'Low', 'accent' => 'var(--teal)'];
+    if ($cost_index <= COST_MEDIUM_MAX) return ['label' => 'Medium', 'accent' => 'var(--gold)'];
+    return ['label' => 'High', 'accent' => 'var(--stamp)'];
 }
 
-// -----------------------------------------------------
-// STEP A: Handle "Add to Trip" form submission (POST)
-// -----------------------------------------------------
 $success_message = "";
 $error_message = "";
 
@@ -45,8 +34,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_trip'])) {
 
     if (empty($trip_id) || empty($city_id)) {
         $error_message = "Please select a trip first!";
+    } elseif (empty($arrival_date) || empty($departure_date)) {
+        $error_message = "Please fill in both arrival and departure dates.";
+    } elseif (strtotime($departure_date) < strtotime($arrival_date)) {
+        $error_message = "Departure date cannot be before arrival date.";
     } else {
-        // Security check: e trip khareki aaj logged-in user ni j chhe ke nai
         $sql_check = "SELECT Trip_ID FROM TRIP WHERE Trip_ID = ? AND User_ID = ?";
         $stmt = $conn->prepare($sql_check);
         $stmt->bind_param("ii", $trip_id, $user_id);
@@ -57,7 +49,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_trip'])) {
         if (!$owns_trip) {
             $error_message = "Invalid trip selected.";
         } else {
-            // Stop_Order calculate karo
             $sql_order = "SELECT COALESCE(MAX(Stop_Order), 0) + 1 AS next_order FROM TRIP_STOP WHERE Trip_ID = ?";
             $stmt = $conn->prepare($sql_order);
             $stmt->bind_param("i", $trip_id);
@@ -65,7 +56,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_trip'])) {
             $next_order = $stmt->get_result()->fetch_assoc()['next_order'];
             $stmt->close();
 
-            // Have TRIP_STOP table ma naya stop insert karo
             $sql_insert = "INSERT INTO TRIP_STOP (Trip_ID, City_ID, Stop_Order, Arrival_Date, Departure_Date)
                             VALUES (?, ?, ?, ?, ?)";
             $stmt = $conn->prepare($sql_insert);
@@ -80,9 +70,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_trip'])) {
     }
 }
 
-// -----------------------------------------------------
-// STEP B: User ni trips list lavo (dropdown mate)
-// -----------------------------------------------------
 $sql_trips = "SELECT Trip_ID, Trip_Name FROM TRIP WHERE User_ID = ? ORDER BY Trip_ID DESC";
 $stmt = $conn->prepare($sql_trips);
 $stmt->bind_param("i", $user_id);
@@ -90,9 +77,6 @@ $stmt->execute();
 $user_trips = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-// -----------------------------------------------------
-// STEP C: Badhi cities DB mathi lavo (CITY + COUNTRY joined)
-// -----------------------------------------------------
 $sql_cities = "SELECT CITY.City_ID, CITY.City_Name, CITY.Cost_Index, CITY.Image,
                       COUNTRY.Country_Name, COUNTRY.Region
                FROM CITY
@@ -100,13 +84,11 @@ $sql_cities = "SELECT CITY.City_ID, CITY.City_Name, CITY.Cost_Index, CITY.Image,
                ORDER BY CITY.Popularity DESC";
 $all_cities = $conn->query($sql_cities)->fetch_all(MYSQLI_ASSOC);
 
-// GET params thi filters lai lo
 $search_term = $_GET['search'] ?? '';
 $filter_region = $_GET['region'] ?? '';
 $filter_country = $_GET['country'] ?? '';
 $filter_cost = $_GET['cost'] ?? '';
 
-// PHP ma j filter karo (array_filter)
 $filtered_cities = array_filter($all_cities, function ($city) use ($search_term, $filter_region, $filter_country, $filter_cost) {
     $matches_search = empty($search_term) || stripos($city['City_Name'], $search_term) !== false;
     $matches_region = empty($filter_region) || $city['Region'] === $filter_region;
@@ -115,13 +97,11 @@ $filtered_cities = array_filter($all_cities, function ($city) use ($search_term,
     return $matches_search && $matches_region && $matches_country && $matches_cost;
 });
 
-// Dropdown mate unique regions/countries kadhi lo
-$all_regions = array_unique(array_column($all_cities, 'Region'));
+$all_regions = array_unique(array_filter(array_column($all_cities, 'Region')));
 $all_countries = array_unique(array_column($all_cities, 'Country_Name'));
 sort($all_regions);
 sort($all_countries);
 
-// Sort results
 $sort_by = $_GET['sort'] ?? 'popularity';
 if ($sort_by === 'name') {
     usort($filtered_cities, fn($a, $b) => strcasecmp($a['City_Name'], $b['City_Name']));
@@ -130,22 +110,26 @@ if ($sort_by === 'name') {
 } elseif ($sort_by === 'cost_high') {
     usort($filtered_cities, fn($a, $b) => $b['Cost_Index'] <=> $a['Cost_Index']);
 }
-// 'popularity' = keep DB order (already ORDER BY Popularity DESC)
 ?>
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>City Search - GlobeTrotter</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<style>
+.cost-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: 'Space Mono', monospace; font-size: 0.72rem;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  color: #fff; padding: 4px 10px; border-radius: 20px; margin-top: 6px;
+}
+</style>
 </head>
-
 <body>
 
 <?php $active_page = 'city-search'; include 'includes/navbar.php'; ?>
@@ -158,13 +142,19 @@ if ($sort_by === 'name') {
 </div>
 
 <?php if ($success_message): ?>
-<div class="alert alert-success"><?php echo $success_message; ?></div>
+<div class="alert alert-success"><i class="bi bi-check-circle"></i> <?php echo htmlspecialchars($success_message); ?></div>
 <?php endif; ?>
 <?php if ($error_message): ?>
-<div class="alert alert-danger"><?php echo $error_message; ?></div>
+<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> <?php echo htmlspecialchars($error_message); ?></div>
 <?php endif; ?>
 
-<!-- ===== SEARCH + FILTER FORM (GET method) ===== -->
+<?php if (count($user_trips) === 0): ?>
+<div class="alert alert-warning">
+<i class="bi bi-info-circle"></i> You don't have any trips yet.
+<a href="create-trip.php">Create a trip first</a>, then come back to add cities.
+</div>
+<?php endif; ?>
+
 <form method="GET" class="row g-2 mb-4">
 <div class="col-md-4">
 <label class="form-label"><i class="bi bi-search"></i> City Name</label>
@@ -216,11 +206,12 @@ value="<?php echo htmlspecialchars($search_term); ?>">
 </div>
 </form>
 
-<!-- ===== CITY RESULTS ===== -->
+<p class="text-muted mb-3"><i class="bi bi-signpost-2"></i> <?php echo count($filtered_cities); ?> cit<?php echo count($filtered_cities) === 1 ? 'y' : 'ies'; ?> found</p>
+
 <div class="row g-4">
 <?php if (count($filtered_cities) === 0): ?>
 <div class="col-12">
-<div class="alert alert-warning">No cities found. Try a different search or filter.</div>
+<div class="alert alert-warning"><i class="bi bi-emoji-frown"></i> No cities found. Try a different search or filter.</div>
 </div>
 <?php else: ?>
 <?php foreach ($filtered_cities as $city): ?>
@@ -231,8 +222,8 @@ value="<?php echo htmlspecialchars($search_term); ?>">
 <img src="<?php echo htmlspecialchars($city_image); ?>" class="card-img-top" alt="<?php echo htmlspecialchars($city['City_Name']); ?>">
 <div class="card-body">
 <h5 class="card-title"><?php echo htmlspecialchars($city['City_Name']); ?></h5>
-<p class="card-text mb-1"><i class="bi bi-geo-alt"></i> <?php echo htmlspecialchars($city['Country_Name']); ?> · <?php echo htmlspecialchars($city['Region']); ?></p>
-<span class="badge <?php echo $cost['class']; ?>"><i class="bi bi-wallet2"></i> <?php echo $cost['label']; ?> Cost</span>
+<p class="card-text mb-0"><i class="bi bi-geo-alt"></i> <?php echo htmlspecialchars($city['Country_Name']); ?><?php echo $city['Region'] ? ' · ' . htmlspecialchars($city['Region']) : ''; ?></p>
+<span class="cost-chip" style="background-color: <?php echo $cost['accent']; ?>;"><i class="bi bi-wallet2"></i> <?php echo $cost['label']; ?> Cost</span>
 
 <div class="mt-3">
 <?php if (count($user_trips) > 0): ?>
@@ -248,7 +239,6 @@ data-bs-toggle="modal" data-bs-target="#addModal<?php echo $city['City_ID']; ?>"
 </div>
 </div>
 
-<!-- ===== MODAL for this city ===== -->
 <div class="modal fade" id="addModal<?php echo $city['City_ID']; ?>" tabindex="-1">
 <div class="modal-dialog">
 <div class="modal-content">
@@ -294,8 +284,6 @@ data-bs-toggle="modal" data-bs-target="#addModal<?php echo $city['City_ID']; ?>"
 </div>
 
 <footer><p>Made with <span>❤️</span> for GlobeTrotter Hackathon</p></footer>
-
 <script src="js/script.js"></script>
 </body>
-
 </html>
