@@ -18,7 +18,16 @@ if (!isset($_SESSION['User_ID'])) {
     exit();
 }
 
-$user_id = $_SESSION['User_ID'];
+$user_id = (int) $_SESSION['User_ID'];
+
+
+// =====================================================
+// SMALL HELPER - avoid repeating htmlspecialchars() everywhere
+// =====================================================
+
+function e($str) {
+    return htmlspecialchars((string) $str, ENT_QUOTES, 'UTF-8');
+}
 
 
 // =====================================================
@@ -59,7 +68,7 @@ $sql_trips = "SELECT Trip_ID,
                      Start_Date,
                      End_Date,
                      Cover_Photo,
-                     Budget
+                     COALESCE(Budget, 0) AS Budget
               FROM TRIP
               WHERE User_ID = ?
               ORDER BY Trip_ID DESC
@@ -83,82 +92,100 @@ if ($stmt !== false) {
 
 
 // =====================================================
-// CALCULATE ACTUAL SPENDING FOR EACH RECENT TRIP
+// CALCULATE ACTUAL SPENDING FOR RECENT TRIPS
 // IMPORTANT:
 // Actual spending comes from EXPENSE.Amount.
 // ITINERARY.Activity_Cost is planned/estimated activity
 // cost and should NOT be counted as actual spending.
+//
+// NOTE: this used to run one EXPENSE query per trip inside
+// the loop (N+1). Since we already know all the Trip_IDs
+// from $recent_trips, we fetch every trip's spend in a
+// single grouped query instead.
 // =====================================================
 
-$sql_spent = "SELECT COALESCE(SUM(Amount), 0) AS spent
-              FROM EXPENSE
-              WHERE Trip_ID = ?";
+$spent_map = [];
 
-$stmt = $conn->prepare($sql_spent);
+if (count($recent_trips) > 0) {
 
-$today = date('Y-m-d');
+    $trip_ids = array_map('intval', array_column($recent_trips, 'Trip_ID'));
+    $placeholders = implode(',', array_fill(0, count($trip_ids), '?'));
+    $types = str_repeat('i', count($trip_ids));
 
-if ($stmt !== false) {
+    $sql_spent = "SELECT Trip_ID, COALESCE(SUM(Amount), 0) AS spent
+                  FROM EXPENSE
+                  WHERE Trip_ID IN ($placeholders)
+                  GROUP BY Trip_ID";
 
-    foreach ($recent_trips as $key => $trip) {
+    $stmt = $conn->prepare($sql_spent);
 
-        $trip_id = (int) $trip['Trip_ID'];
+    if ($stmt !== false) {
 
-        $stmt->bind_param("i", $trip_id);
-
-        $spent = 0;
+        $stmt->bind_param($types, ...$trip_ids);
 
         if ($stmt->execute()) {
 
-            $spent_row = $stmt->get_result()->fetch_assoc();
+            $spent_rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
-            if ($spent_row) {
-                $spent = (float) ($spent_row['spent'] ?? 0);
+            foreach ($spent_rows as $row) {
+                $spent_map[(int) $row['Trip_ID']] = (float) $row['spent'];
             }
         }
 
-
-        $budget = (float) ($trip['Budget'] ?? 0);
-
-
-        // Store actual spending
-        $recent_trips[$key]['spent'] = $spent;
-
-
-        // Calculate percentage of budget used
-        $recent_trips[$key]['percent_used'] =
-            $budget > 0
-                ? min(100, round(($spent / $budget) * 100))
-                : 0;
-
-
-        // Check whether actual spending exceeds budget
-        $recent_trips[$key]['is_over_budget'] =
-            $budget > 0 && $spent > $budget;
-
-
-        // =================================================
-        // TRIP STATUS
-        // =================================================
-
-        if ($trip['End_Date'] < $today) {
-
-            $recent_trips[$key]['status'] = 'past';
-
-        } elseif (
-            $trip['Start_Date'] <= $today &&
-            $trip['End_Date'] >= $today
-        ) {
-
-            $recent_trips[$key]['status'] = 'ongoing';
-
-        } else {
-
-            $recent_trips[$key]['status'] = 'upcoming';
-        }
+        $stmt->close();
     }
+}
 
-    $stmt->close();
+$today = date('Y-m-d');
+
+foreach ($recent_trips as $key => $trip) {
+
+    $trip_id = (int) $trip['Trip_ID'];
+    $spent = $spent_map[$trip_id] ?? 0.0;
+    $budget = (float) ($trip['Budget'] ?? 0);
+
+
+    // Store actual spending
+    $recent_trips[$key]['spent'] = $spent;
+
+
+    // Calculate percentage of budget used
+    $recent_trips[$key]['percent_used'] =
+        $budget > 0
+            ? min(100, round(($spent / $budget) * 100))
+            : 0;
+
+
+    // Check whether actual spending exceeds budget
+    $recent_trips[$key]['is_over_budget'] =
+        $budget > 0 && $spent > $budget;
+
+
+    // =================================================
+    // TRIP STATUS
+    // Guard against missing/invalid dates so a bad row
+    // doesn't throw a warning or mis-sort the trip.
+    // =================================================
+
+    $start = $trip['Start_Date'] ?? null;
+    $end = $trip['End_Date'] ?? null;
+
+    if (!$start || !$end) {
+
+        $recent_trips[$key]['status'] = 'upcoming';
+
+    } elseif ($end < $today) {
+
+        $recent_trips[$key]['status'] = 'past';
+
+    } elseif ($start <= $today && $end >= $today) {
+
+        $recent_trips[$key]['status'] = 'ongoing';
+
+    } else {
+
+        $recent_trips[$key]['status'] = 'upcoming';
+    }
 }
 
 
@@ -337,7 +364,7 @@ include 'includes/navbar.php';
 
 <h2 class="section-title mb-1">
     Welcome back,
-    <?php echo htmlspecialchars($user_name); ?>
+    <?php echo e($user_name); ?>
     <i class="bi bi-hand-thumbs-up"></i>
 </h2>
 
@@ -532,9 +559,10 @@ $photo = !empty($trip['Cover_Photo'])
 ?>
 
 <img
-    src="<?php echo htmlspecialchars($photo); ?>"
+    src="<?php echo e($photo); ?>"
     class="card-img-top"
-    alt="<?php echo htmlspecialchars($trip['Trip_Name']); ?>"
+    alt="<?php echo e($trip['Trip_Name']); ?>"
+    loading="lazy"
 >
 
 
@@ -542,7 +570,7 @@ $photo = !empty($trip['Cover_Photo'])
 
 
 <h5 class="card-title">
-    <?php echo htmlspecialchars($trip['Trip_Name']); ?>
+    <?php echo e($trip['Trip_Name']); ?>
 </h5>
 
 
@@ -550,11 +578,17 @@ $photo = !empty($trip['Cover_Photo'])
 
 <i class="bi bi-calendar3"></i>
 
-<?php echo date('d M', strtotime($trip['Start_Date'])); ?>
+<?php
 
-&mdash;
+if (!empty($trip['Start_Date']) && !empty($trip['End_Date'])) {
+    echo date('d M', strtotime($trip['Start_Date']));
+    echo ' &mdash; ';
+    echo date('d M Y', strtotime($trip['End_Date']));
+} else {
+    echo 'Dates not set';
+}
 
-<?php echo date('d M Y', strtotime($trip['End_Date'])); ?>
+?>
 
 </p>
 
@@ -624,7 +658,7 @@ No budget set for this trip
 
 
 <a
-    href="itinerary-view.php?trip_id=<?php echo $trip['Trip_ID']; ?>"
+    href="itinerary-view.php?trip_id=<?php echo (int) $trip['Trip_ID']; ?>"
     class="btn btn-outline-primary btn-sm"
 >
     View Trip
@@ -690,16 +724,17 @@ $city_image = !empty($city['Image'])
 
 
 <img
-    src="<?php echo htmlspecialchars($city_image); ?>"
+    src="<?php echo e($city_image); ?>"
     class="card-img-top"
-    alt="<?php echo htmlspecialchars($city['City_Name']); ?>"
+    alt="<?php echo e($city['City_Name']); ?>"
+    loading="lazy"
 >
 
 
 <div class="card-body">
 
 <h6 class="card-title mb-1">
-    <?php echo htmlspecialchars($city['City_Name']); ?>
+    <?php echo e($city['City_Name']); ?>
 </h6>
 
 
@@ -707,7 +742,7 @@ $city_image = !empty($city['Image'])
 
 <i class="bi bi-geo-alt"></i>
 
-<?php echo htmlspecialchars($city['Country_Name']); ?>
+<?php echo e($city['Country_Name']); ?>
 
 </p>
 
