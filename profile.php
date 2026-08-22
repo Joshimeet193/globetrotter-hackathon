@@ -279,79 +279,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 <body class="bg-cream">
 
-
-<!-- ======================================================
-     NAVBAR
-     ====================================================== -->
-
-<nav class="navbar navbar-expand-lg">
-
-    <div class="container">
-
-        <a class="navbar-brand" href="dashboard.php">
-            🌍 GlobeTrotter
-        </a>
-
-
-        <button
-            class="navbar-toggler"
-            type="button"
-            data-bs-toggle="collapse"
-            data-bs-target="#navbarMenu"
-        >
-
-            <span class="navbar-toggler-icon"></span>
-
-        </button>
-
-
-        <div class="collapse navbar-collapse" id="navbarMenu">
-
-            <ul class="navbar-nav ms-auto">
-
-                <li class="nav-item">
-
-                    <a class="nav-link" href="dashboard.php">
-
-                        <i class="bi bi-speedometer2 me-1"></i>
-                        Dashboard
-
-                    </a>
-
-                </li>
-
-
-                <li class="nav-item">
-
-                    <a class="nav-link" href="profile.php">
-
-                        <i class="bi bi-person-circle me-1"></i>
-                        Profile
-
-                    </a>
-
-                </li>
-
-
-                <li class="nav-item">
-
-                    <a class="nav-link" href="logout.php">
-
-                        <i class="bi bi-box-arrow-right me-1"></i>
-                        Logout
-
-                    </a>
-
-                </li>
-
-            </ul>
-
-        </div>
-
-    </div>
-
-</nav>
-
+<?php $active_page = 'profile'; include 'includes/navbar.php'; ?>
 
 <!-- ======================================================
      PROFILE
@@ -642,6 +570,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </footer>
 
 
+<script src="js/script.js"></script>
 </body>
 
 </html>
