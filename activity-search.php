@@ -117,7 +117,10 @@ sort($all_types);
 <?php $active_page = 'activity-search'; include 'includes/navbar.php'; ?>
 
 <div class="container my-4">
-<h2 class="section-title"><i class="bi bi-compass"></i> Search Activities</h2>
+<div class="dashboard-hero mb-4">
+<h2 class="section-title mb-1"><i class="bi bi-compass"></i> Search Activities</h2>
+<p class="text-muted mb-0">Fill your itinerary with things to do at each stop.</p>
+</div>
 
 <?php if ($success_message): ?>
 <div class="alert alert-success"><?php echo $success_message; ?></div>
