@@ -8,10 +8,6 @@ session_start();
 include 'includes/db-connect.php';
 
 
-// =========================================================
-// CHECK LOGIN
-// =========================================================
-
 if (!isset($_SESSION['User_ID'])) {
     header('Location: index.php');
     exit();
