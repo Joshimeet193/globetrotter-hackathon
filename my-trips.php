@@ -2,11 +2,10 @@
 /* =========================================================
    my-trips.php
    Shows all trips belonging to the logged-in user as cards.
-   Fixed: was querying a "trips" table that doesn't exist.
-   Now uses TRIP (Trip_ID, Trip_Name, Start_Date, End_Date,
-   Description, Cover_Photo, User_ID) from the real schema.
-   Delete now also cleans up child rows (TRIP_STOP, ITINERARY,
-   EXPENSE, TRIP_SHARE) so it doesn't fail on foreign keys.
+   FIXED: delete order — EXPENSE must be removed before
+   TRIP_STOP, since EXPENSE.Stop_ID references TRIP_STOP.
+   Deleting TRIP_STOP first can trigger a foreign key error
+   if any expense rows are tied to a specific stop.
    ========================================================= */
 session_start();
 include 'includes/db-connect.php';
@@ -32,7 +31,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_trip'])) {
     if (!$owns_trip) {
         $error_message = 'Invalid trip.';
     } else {
-        // Delete ITINERARY rows for every stop of this trip
+        // Delete ITINERARY rows for every stop of this trip first
+        // (ITINERARY references TRIP_STOP, so it must go before TRIP_STOP)
         $del1 = $conn->prepare("DELETE ITINERARY FROM ITINERARY
                                  INNER JOIN TRIP_STOP ON ITINERARY.Stop_ID = TRIP_STOP.Stop_ID
                                  WHERE TRIP_STOP.Trip_ID = ?");
@@ -40,8 +40,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_trip'])) {
         $del1->execute();
         $del1->close();
 
-        // Delete stops, expenses, shares, then the trip itself
-        foreach (['TRIP_STOP', 'EXPENSE', 'TRIP_SHARE'] as $table) {
+        // FIX: EXPENSE before TRIP_STOP — EXPENSE.Stop_ID references
+        // TRIP_STOP.Stop_ID, so TRIP_STOP can't be deleted while an
+        // EXPENSE row still points at it.
+        foreach (['EXPENSE', 'TRIP_STOP', 'TRIP_SHARE'] as $table) {
             $del = $conn->prepare("DELETE FROM $table WHERE Trip_ID = ?");
             $del->bind_param("i", $trip_id);
             $del->execute();
