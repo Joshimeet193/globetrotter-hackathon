@@ -114,15 +114,7 @@ sort($all_types);
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg">
-<div class="container">
-<a class="navbar-brand" href="dashboard.php">🌍 GlobeTrotter</a>
-<div class="d-flex">
-<a href="dashboard.php" class="btn btn-outline-primary btn-sm me-2"><i class="bi bi-house"></i> Dashboard</a>
-<a href="city-search.php" class="btn btn-outline-primary btn-sm"><i class="bi bi-search"></i> City Search</a>
-</div>
-</div>
-</nav>
+<?php $active_page = 'activity-search'; include 'includes/navbar.php'; ?>
 
 <div class="container my-4">
 <h2 class="section-title"><i class="bi bi-compass"></i> Search Activities</h2>
@@ -277,5 +269,6 @@ data-bs-toggle="modal" data-bs-target="#addModal<?php echo $activity['Activity_I
 </div>
 
 <footer><p>Made with <span>❤️</span> for GlobeTrotter Hackathon</p></footer>
+<script src="js/script.js"></script>
 </body>
 </html>
