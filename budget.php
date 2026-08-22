@@ -15,7 +15,8 @@ if (!isset($_SESSION['User_ID'])) {
 $user_id = $_SESSION['User_ID'];
 
 if (!isset($_GET['trip_id'])) {
-    die("No trip selected.");
+    header("Location: my-trips.php");
+    exit();
 }
 
 $trip_id = intval($_GET['trip_id']);
@@ -27,7 +28,8 @@ $tripQuery->execute();
 $tripResult = $tripQuery->get_result();
 
 if ($tripResult->num_rows === 0) {
-    die("Trip not found or you don't have access to it.");
+    header("Location: my-trips.php?error=trip_not_found");
+    exit();
 }
 
 $trip = $tripResult->fetch_assoc();
