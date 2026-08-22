@@ -1,12 +1,11 @@
 <?php
 // itinerary-view.php
-// Purpose: Show the full itinerary of a trip - stops (cities) in order,
-// with the activities scheduled for each stop (from ITINERARY + ACTIVITY tables)
+// Shows the full itinerary of a trip — stops in order, with
+// scheduled activities per stop, plus a running total cost.
 
 session_start();
 include 'includes/db-connect.php';
 
-// Make sure user is logged in
 if (!isset($_SESSION['User_ID'])) {
     header("Location: index.php");
     exit();
@@ -14,7 +13,6 @@ if (!isset($_SESSION['User_ID'])) {
 
 $user_id = $_SESSION['User_ID'];
 
-// Get trip_id from URL, e.g. itinerary-view.php?trip_id=3
 if (!isset($_GET['trip_id'])) {
     header("Location: my-trips.php");
     exit();
@@ -22,7 +20,6 @@ if (!isset($_GET['trip_id'])) {
 
 $trip_id = intval($_GET['trip_id']);
 
-// Fetch trip details (and confirm it belongs to this user)
 $tripQuery = $conn->prepare("SELECT * FROM TRIP WHERE Trip_ID = ? AND User_ID = ?");
 $tripQuery->bind_param("ii", $trip_id, $user_id);
 $tripQuery->execute();
@@ -35,7 +32,6 @@ if ($tripResult->num_rows === 0) {
 
 $trip = $tripResult->fetch_assoc();
 
-// Fetch all stops (cities) for this trip, ordered by Stop_Order
 $stopsQuery = $conn->prepare("
     SELECT ts.*, c.City_Name, c.Image AS City_Image, co.Country_Name
     FROM TRIP_STOP ts
@@ -53,7 +49,7 @@ while ($row = $stopsResult->fetch_assoc()) {
     $stops[] = $row;
 }
 
-// For each stop, fetch its scheduled itinerary items (joined with ACTIVITY)
+$trip_total_cost = 0;
 foreach ($stops as $index => $stop) {
     $itinQuery = $conn->prepare("
         SELECT i.*, a.Activity_Name, a.Activity_Type, a.Duration
@@ -69,20 +65,38 @@ foreach ($stops as $index => $stop) {
     $items = [];
     while ($item = $itinResult->fetch_assoc()) {
         $items[] = $item;
+        $trip_total_cost += (float) $item['Activity_Cost'];
     }
 
     $stops[$index]['itinerary_items'] = $items;
 }
+
+$trip_days = (strtotime($trip['End_Date']) - strtotime($trip['Start_Date'])) / 86400 + 1;
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>Itinerary - <?php echo htmlspecialchars($trip['Trip_Name']); ?> | GlobeTrotter</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<style>
+.trip-summary-strip {
+  display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 26px;
+}
+.trip-summary-strip > div {
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 18px; font-family: 'Space Mono', monospace; font-size: 0.85rem; color: var(--ink);
+}
+.stop-order-stamp {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--stamp); color: #fff;
+  font-family: 'Space Mono', monospace; font-size: 0.75rem; font-weight: 700;
+  margin-right: 6px;
+}
+</style>
 </head>
 <body>
 
@@ -90,7 +104,7 @@ foreach ($stops as $index => $stop) {
 
 <div class="container py-section">
 
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
 <div>
 <h2><i class="bi bi-map text-primary-custom"></i> <?php echo htmlspecialchars($trip['Trip_Name']); ?></h2>
 <p class="text-muted mb-0">
@@ -110,6 +124,12 @@ foreach ($stops as $index => $stop) {
 </div>
 </div>
 
+<div class="trip-summary-strip">
+<div><i class="bi bi-calendar-range"></i> <?php echo (int) $trip_days; ?> day trip</div>
+<div><i class="bi bi-geo-alt"></i> <?php echo count($stops); ?> stop<?php echo count($stops) === 1 ? '' : 's'; ?></div>
+<div><i class="bi bi-cash-coin"></i> ₹<?php echo number_format($trip_total_cost, 2); ?> planned</div>
+</div>
+
 <?php if ($trip['Description']): ?>
 <p class="mb-4"><?php echo htmlspecialchars($trip['Description']); ?></p>
 <?php endif; ?>
@@ -125,8 +145,7 @@ foreach ($stops as $index => $stop) {
 <?php foreach ($stops as $stop): ?>
 <div class="timeline-day">
 <h5>
-<i class="bi bi-geo-alt-fill text-primary-custom"></i>
-Stop <?php echo $stop['Stop_Order']; ?>:
+<span class="stop-order-stamp"><?php echo $stop['Stop_Order']; ?></span>
 <?php echo htmlspecialchars($stop['City_Name']); ?>,
 <?php echo htmlspecialchars($stop['Country_Name']); ?>
 </h5>
@@ -187,7 +206,6 @@ Stop <?php echo $stop['Stop_Order']; ?>:
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
 <script src="js/script.js"></script>
 </body>
 </html>
