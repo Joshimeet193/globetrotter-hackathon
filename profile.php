@@ -1,246 +1,251 @@
 <?php
 
-// Start session
+// Secure session configuration
+$is_https = (
+    (!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off") ||
+    (isset($_SERVER["SERVER_PORT"]) && (int) $_SERVER["SERVER_PORT"] === 443)
+);
+
+session_set_cookie_params([
+    "lifetime" => 0,
+    "path" => "/",
+    "secure" => $is_https,
+    "httponly" => true,
+    "samesite" => "Lax"
+]);
+
 session_start();
 
-// Check if user is logged in
-if (!isset($_SESSION["User_ID"])) {
-    header("Location: index.php");
-    exit();
+// Create a CSRF token for state-changing forms.
+if (empty($_SESSION["csrf_token"])) {
+    $_SESSION["csrf_token"] = bin2hex(random_bytes(32));
+}
+
+function validate_csrf_token(): bool
+{
+    return isset($_POST["csrf_token"], $_SESSION["csrf_token"])
+        && is_string($_POST["csrf_token"])
+        && hash_equals($_SESSION["csrf_token"], $_POST["csrf_token"]);
+}
+
+function text_length(string $value): int
+{
+    return function_exists("mb_strlen") ? mb_strlen($value, "UTF-8") : strlen($value);
 }
 
 // Include database connection
 require_once "includes/db-connect.php";
 
+// Check if user is logged in
+if (!isset($_SESSION["user_id"]) || !filter_var($_SESSION["user_id"], FILTER_VALIDATE_INT)) {
+    header("Location: index.php");
+    exit();
+}
 
-// Get logged-in user's ID
-$user_id = $_SESSION["User_ID"];
-
+$user_id = (int) $_SESSION["user_id"];
 
 // Variables for messages
 $message = "";
 $message_type = "";
 
+// Helper: only delete files that this application stores in uploads/.
+function delete_profile_photo(string $relative_path): void
+{
+    $relative_path = str_replace("\\", "/", $relative_path);
 
-// ======================================================
-// FETCH CURRENT USER DETAILS
-// ======================================================
+    if (strpos($relative_path, "uploads/") !== 0) {
+        return;
+    }
 
+    $full_path = __DIR__ . "/" . $relative_path;
+
+    if (is_file($full_path)) {
+        unlink($full_path);
+    }
+}
+
+// Fetch current user details
 $sql = "SELECT User_ID, Name, Email, Profile_Photo, Language, Created_At
         FROM USERS
         WHERE User_ID = ?";
 
 $stmt = $conn->prepare($sql);
 
-$stmt->bind_param("i", $user_id);
-
-$stmt->execute();
-
-$result = $stmt->get_result();
-
-
-// Check if user exists
-if ($result->num_rows == 1) {
-
-    $user = $result->fetch_assoc();
-
+if ($stmt === false) {
+    http_response_code(500);
+    $message = "Something went wrong. Please try again.";
+    $message_type = "danger";
+    $user = null;
 } else {
+    $stmt->bind_param("i", $user_id);
 
-    // User not found
+    if (!$stmt->execute()) {
+        http_response_code(500);
+        $message = "Something went wrong. Please try again.";
+        $message_type = "danger";
+        $user = null;
+    } else {
+        $result = $stmt->get_result();
+
+        if ($result->num_rows === 1) {
+            $user = $result->fetch_assoc();
+        } else {
+            $user = null;
+        }
+    }
+
+    $stmt->close();
+}
+
+if ($user === null) {
+    $_SESSION = [];
     session_destroy();
-
     header("Location: index.php");
     exit();
 }
 
-$stmt->close();
-
-
-// ======================================================
-// UPDATE PROFILE
-// ======================================================
-
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-
-    // Get form values
-    $name = trim($_POST["name"]);
-    $email = trim($_POST["email"]);
-    $language = trim($_POST["language"]);
-
-
-    // Check required fields
-    if (empty($name) || empty($email)) {
-
-        $message = "Name and email are required.";
+// Update profile
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    if (!validate_csrf_token()) {
+        $message = "Invalid request. Please refresh the page and try again.";
         $message_type = "danger";
+    } else {
+        $name = trim($_POST["name"] ?? "");
+        $email = trim($_POST["email"] ?? "");
+        $language = trim($_POST["language"] ?? "");
 
-    }
-
-    // Check email format
-    elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-
-        $message = "Please enter a valid email address.";
-        $message_type = "danger";
-
-    }
-
-    else {
-
-        // ==================================================
-        // CHECK IF EMAIL IS ALREADY USED BY ANOTHER USER
-        // ==================================================
-
-        $sql = "SELECT User_ID
-                FROM USERS
-                WHERE Email = ?
-                AND User_ID != ?";
-
-        $stmt = $conn->prepare($sql);
-
-        $stmt->bind_param("si", $email, $user_id);
-
-        $stmt->execute();
-
-        $result = $stmt->get_result();
-
-
-        if ($result->num_rows > 0) {
-
-            $message = "This email is already being used by another account.";
+        // Validate fields
+        if ($name === "" || $email === "") {
+            $message = "Name and email are required.";
             $message_type = "danger";
+        } elseif (text_length($name) > 50) {
+            $message = "Name must not exceed 50 characters.";
+            $message_type = "danger";
+        } elseif (text_length($email) > 100) {
+            $message = "Email address must not exceed 100 characters.";
+            $message_type = "danger";
+        } elseif (text_length($language) > 30) {
+            $message = "Language must not exceed 30 characters.";
+            $message_type = "danger";
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $message = "Please enter a valid email address.";
+            $message_type = "danger";
+        }
 
-            $stmt->close();
+        $old_profile_photo = $user["Profile_Photo"] ?? "";
+        $new_profile_photo = $old_profile_photo;
+        $new_upload_path = null;
 
-        } else {
+        // Check whether a new photo was selected.
+        if (empty($message) && isset($_FILES["profile_photo"]) && $_FILES["profile_photo"]["error"] !== UPLOAD_ERR_NO_FILE) {
+            $upload_error = $_FILES["profile_photo"]["error"];
 
-            $stmt->close();
-
-
-            // ==================================================
-            // UPDATE PROFILE PHOTO
-            // ==================================================
-
-            $profile_photo = $user["Profile_Photo"];
-
-
-            // Check whether a new photo was selected
-            if (
-                isset($_FILES["profile_photo"]) &&
-                $_FILES["profile_photo"]["error"] == 0
-            ) {
-
-                $file_name = $_FILES["profile_photo"]["name"];
+            if ($upload_error !== UPLOAD_ERR_OK) {
+                $message = "Unable to upload profile photo.";
+                $message_type = "danger";
+            } else {
                 $file_tmp = $_FILES["profile_photo"]["tmp_name"];
-                $file_size = $_FILES["profile_photo"]["size"];
+                $file_size = (int) $_FILES["profile_photo"]["size"];
 
-                // Get file extension
-                $file_extension = strtolower(
-                    pathinfo($file_name, PATHINFO_EXTENSION)
-                );
-
-
-                // Allowed image types
-                $allowed_extensions = array(
-                    "jpg",
-                    "jpeg",
-                    "png",
-                    "webp"
-                );
-
-
-                // Check file type
-                if (!in_array($file_extension, $allowed_extensions)) {
-
-                    $message = "Only JPG, JPEG, PNG and WEBP images are allowed.";
+                if (!is_uploaded_file($file_tmp)) {
+                    $message = "Invalid uploaded file.";
                     $message_type = "danger";
-
-                }
-
-                // Check file size - maximum 2 MB
-                elseif ($file_size > 2 * 1024 * 1024) {
-
+                } elseif ($file_size > 2 * 1024 * 1024) {
                     $message = "Profile photo must be smaller than 2 MB.";
                     $message_type = "danger";
+                } else {
+                    // Validate the actual file contents, not the filename extension.
+                    $finfo = new finfo(FILEINFO_MIME_TYPE);
+                    $mime_type = $finfo->file($file_tmp);
 
-                }
+                    $allowed_types = [
+                        "image/jpeg" => "jpg",
+                        "image/png" => "png",
+                        "image/webp" => "webp"
+                    ];
 
-                else {
+                    $image_info = @getimagesize($file_tmp);
 
-                    // Create uploads directory if it doesn't exist
-                    $upload_directory = "uploads/";
-
-                    if (!is_dir($upload_directory)) {
-                        mkdir($upload_directory, 0777, true);
-                    }
-
-
-                    // Create unique file name
-                    $new_file_name = "profile_" . $user_id . "_" . time() . "." . $file_extension;
-
-                    $upload_path = $upload_directory . $new_file_name;
-
-
-                    // Move uploaded image
-                    if (move_uploaded_file($file_tmp, $upload_path)) {
-
-                        $profile_photo = $upload_path;
-
-                    } else {
-
-                        $message = "Unable to upload profile photo.";
+                    if (!isset($allowed_types[$mime_type]) || $image_info === false) {
+                        $message = "Only valid JPG, PNG and WEBP images are allowed.";
                         $message_type = "danger";
+                    } elseif (($image_info[0] ?? 0) > 4000 || ($image_info[1] ?? 0) > 4000) {
+                        $message = "Profile photo dimensions must not exceed 4000 × 4000 pixels.";
+                        $message_type = "danger";
+                    } else {
+                        $upload_directory = __DIR__ . "/uploads/";
 
+                        if (!is_dir($upload_directory) && !mkdir($upload_directory, 0755, true)) {
+                            $message = "Unable to prepare the upload directory.";
+                            $message_type = "danger";
+                        } elseif (!is_writable($upload_directory)) {
+                            $message = "The upload directory is not writable.";
+                            $message_type = "danger";
+                        } else {
+                            $file_extension = $allowed_types[$mime_type];
+                            $new_file_name = "profile_" . bin2hex(random_bytes(16)) . "." . $file_extension;
+                            $new_upload_path = "uploads/" . $new_file_name;
+                            $full_upload_path = __DIR__ . "/" . $new_upload_path;
+
+                            if (!move_uploaded_file($file_tmp, $full_upload_path)) {
+                                $new_upload_path = null;
+                                $message = "Unable to upload profile photo.";
+                                $message_type = "danger";
+                            } else {
+                                $new_profile_photo = $new_upload_path;
+                            }
+                        }
                     }
                 }
             }
+        }
 
+        // Update the database only after all validation and upload checks pass.
+        if (empty($message)) {
+            $sql = "UPDATE USERS
+                    SET Name = ?, Email = ?, Profile_Photo = ?, Language = ?
+                    WHERE User_ID = ?";
 
-            // ==================================================
-            // UPDATE DATABASE
-            // ==================================================
+            $stmt = $conn->prepare($sql);
 
-            if (empty($message)) {
-
-                $sql = "UPDATE USERS
-                        SET Name = ?,
-                            Email = ?,
-                            Profile_Photo = ?,
-                            Language = ?
-                        WHERE User_ID = ?";
-
-                $stmt = $conn->prepare($sql);
-
-                $stmt->bind_param(
-                    "ssssi",
-                    $name,
-                    $email,
-                    $profile_photo,
-                    $language,
-                    $user_id
-                );
-
+            if ($stmt === false) {
+                $message = "Something went wrong while updating your profile.";
+                $message_type = "danger";
+            } else {
+                $stmt->bind_param("ssssi", $name, $email, $new_profile_photo, $language, $user_id);
 
                 if ($stmt->execute()) {
+                    // Remove the previous photo only after the database update succeeds.
+                    if ($new_upload_path !== null && $old_profile_photo !== "" && $old_profile_photo !== $new_profile_photo) {
+                        delete_profile_photo($old_profile_photo);
+                    }
 
-                    // Update session name
+                    $_SESSION["user_id"] = $user_id;
+                    $_SESSION["user_name"] = $name;
+                    // Compatibility aliases for existing pages in the project.
+                    $_SESSION["User_ID"] = $user_id;
                     $_SESSION["Name"] = $name;
                     $_SESSION["full_name"] = $name;
 
-                    $message = "Profile updated successfully!";
-                    $message_type = "success";
-
-
-                    // Update displayed values
                     $user["Name"] = $name;
                     $user["Email"] = $email;
-                    $user["Profile_Photo"] = $profile_photo;
+                    $user["Profile_Photo"] = $new_profile_photo;
                     $user["Language"] = $language;
 
+                    $message = "Profile updated successfully!";
+                    $message_type = "success";
                 } else {
+                    // If DB update fails, remove the newly uploaded file so it is not orphaned.
+                    if ($new_upload_path !== null) {
+                        delete_profile_photo($new_upload_path);
+                    }
 
-                    $message = "Something went wrong while updating your profile.";
+                    if ($conn->errno === 1062) {
+                        $message = "This email is already being used by another account.";
+                    } else {
+                        $message = "Something went wrong while updating your profile.";
+                    }
                     $message_type = "danger";
-
                 }
 
                 $stmt->close();
@@ -248,7 +253,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 }
-
 ?>
 
 
@@ -336,7 +340,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             <?php } ?>
 
 
-                            <?php echo htmlspecialchars($message); ?>
+                            <?php echo htmlspecialchars($message, ENT_QUOTES, "UTF-8"); ?>
 
                         </div>
 
@@ -352,7 +356,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         <?php if (!empty($user["Profile_Photo"])) { ?>
 
                             <img
-                                src="<?php echo htmlspecialchars($user["Profile_Photo"]); ?>"
+                                src="<?php echo htmlspecialchars($user["Profile_Photo"], ENT_QUOTES, "UTF-8"); ?>"
                                 alt="Profile Photo"
                                 class="rounded-circle"
                                 width="120"
@@ -381,6 +385,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         action=""
                         enctype="multipart/form-data"
                     >
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION["csrf_token"], ENT_QUOTES, "UTF-8"); ?>">
 
 
                         <!-- Name -->
@@ -393,7 +398,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 id="name"
                                 name="name"
                                 placeholder="Full Name"
-                                value="<?php echo htmlspecialchars($user["Name"]); ?>"
+                                maxlength="50"
+                                value="<?php echo htmlspecialchars($user["Name"], ENT_QUOTES, "UTF-8"); ?>"
                                 required
                             >
 
@@ -418,7 +424,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 id="email"
                                 name="email"
                                 placeholder="Email Address"
-                                value="<?php echo htmlspecialchars($user["Email"]); ?>"
+                                maxlength="100"
+                                value="<?php echo htmlspecialchars($user["Email"], ENT_QUOTES, "UTF-8"); ?>"
                                 required
                             >
 
@@ -443,7 +450,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 id="language"
                                 name="language"
                                 placeholder="Language"
-                                value="<?php echo htmlspecialchars($user["Language"] ?? ""); ?>"
+                                maxlength="30"
+                                value="<?php echo htmlspecialchars($user["Language"] ?? "", ENT_QUOTES, "UTF-8"); ?>"
                             >
 
                             <label for="language">
