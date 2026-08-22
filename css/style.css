@@ -428,3 +428,27 @@ footer span { color: var(--stamp); }
   .d-flex.gap-2.justify-content-center .btn { width: 100%; }
   footer { margin-top: 40px; padding: 14px 0; }
 }
+
+/* =========================================================
+   Bootstrap Modal & Backdrop Layer Fix
+   ========================================================= */
+.modal-backdrop {
+  z-index: 1040 !important;
+}
+
+.modal {
+  z-index: 1055 !important;
+  pointer-events: auto !important;
+}
+
+.modal-dialog {
+  z-index: 1060 !important;
+  position: relative !important;
+}
+
+.modal-content {
+  background-color: var(--card) !important;
+  border-radius: var(--card-radius) !important;
+  border: 1px solid var(--line) !important;
+  pointer-events: auto !important;
+}
