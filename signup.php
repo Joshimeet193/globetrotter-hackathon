@@ -17,10 +17,10 @@ $message_type = "";
 // Check whether signup form was submitted
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
-    // Get values from form
-    $name = trim($_POST["name"]);
-    $email = trim($_POST["email"]);
-    $password = $_POST["password"];
+    // Get values from form safely
+    $name = trim($_POST["name"] ?? "");
+    $email = trim($_POST["email"] ?? "");
+    $password = $_POST["password"] ?? "";
 
 
     // =========================
@@ -31,6 +31,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (empty($name) || empty($email) || empty($password)) {
 
         $message = "Please fill in all fields.";
+        $message_type = "danger";
+
+    }
+
+    // Check name length according to database
+    elseif (strlen($name) > 50) {
+
+        $message = "Name must not exceed 50 characters.";
+        $message_type = "danger";
+
+    }
+
+    // Check email length according to database
+    elseif (strlen($email) > 100) {
+
+        $message = "Email address must not exceed 100 characters.";
         $message_type = "danger";
 
     }
@@ -63,72 +79,118 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         $stmt = $conn->prepare($sql);
 
-        $stmt->bind_param("s", $email);
 
-        $stmt->execute();
+        // Check whether query preparation was successful
+        if ($stmt === false) {
 
-        $stmt->store_result();
-
-
-        // If email already exists
-        if ($stmt->num_rows > 0) {
-
-            $message = "An account with this email already exists.";
+            $message = "Something went wrong. Please try again.";
             $message_type = "danger";
 
-        }
+        } else {
 
-        else {
-
-            // =========================
-            // HASH PASSWORD
-            // =========================
-
-            $hashed_password = password_hash(
-                $password,
-                PASSWORD_DEFAULT
-            );
+            $stmt->bind_param("s", $email);
 
 
-            // =========================
-            // INSERT USER
-            // =========================
-
-            $sql = "INSERT INTO USERS
-                    (Name, Email, Password)
-                    VALUES (?, ?, ?)";
-
-            $insert_stmt = $conn->prepare($sql);
-
-            $insert_stmt->bind_param(
-                "sss",
-                $name,
-                $email,
-                $hashed_password
-            );
-
-
-            // Execute INSERT query
-            if ($insert_stmt->execute()) {
-
-                $message = "Account created successfully! You can now login.";
-                $message_type = "success";
-
-            } else {
+            // Execute SELECT query
+            if (!$stmt->execute()) {
 
                 $message = "Something went wrong. Please try again.";
                 $message_type = "danger";
 
+            } else {
+
+                $stmt->store_result();
+
+
+                // If email already exists
+                if ($stmt->num_rows > 0) {
+
+                    $message = "An account with this email already exists.";
+                    $message_type = "danger";
+
+                }
+
+                else {
+
+                    // =========================
+                    // HASH PASSWORD
+                    // =========================
+
+                    $hashed_password = password_hash(
+                        $password,
+                        PASSWORD_DEFAULT
+                    );
+
+
+                    // Check whether password hashing was successful
+                    if ($hashed_password === false) {
+
+                        $message = "Something went wrong. Please try again.";
+                        $message_type = "danger";
+
+                    } else {
+
+                        // =========================
+                        // INSERT USER
+                        // =========================
+
+                        $sql = "INSERT INTO USERS
+                                (Name, Email, Password)
+                                VALUES (?, ?, ?)";
+
+                        $insert_stmt = $conn->prepare($sql);
+
+
+                        // Check INSERT preparation
+                        if ($insert_stmt === false) {
+
+                            $message = "Something went wrong. Please try again.";
+                            $message_type = "danger";
+
+                        } else {
+
+                            $insert_stmt->bind_param(
+                                "sss",
+                                $name,
+                                $email,
+                                $hashed_password
+                            );
+
+
+                            // Execute INSERT query
+                            if ($insert_stmt->execute()) {
+
+                                $message = "Account created successfully! You can now login.";
+                                $message_type = "success";
+
+                            } else {
+
+                                // Handle duplicate email race condition
+                                if ($conn->errno == 1062) {
+
+                                    $message = "An account with this email already exists.";
+
+                                } else {
+
+                                    $message = "Something went wrong. Please try again.";
+
+                                }
+
+                                $message_type = "danger";
+                            }
+
+
+                            // Close insert statement
+                            $insert_stmt->close();
+                        }
+                    }
+                }
             }
 
 
-            // Close insert statement
-            $insert_stmt->close();
+            // Close select statement
+            $stmt->close();
         }
-
-
-        // Close select statement
-        $stmt->close();
     }
 }
 
@@ -379,4 +441,3 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </body>
 
 </html>
-
