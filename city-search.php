@@ -26,6 +26,27 @@ function cost_label($cost_index) {
 $success_message = "";
 $error_message = "";
 
+// =====================================================
+// FIX: read trip_id from the URL (?trip_id=X) so the page
+// knows which trip we arrived here to add cities to.
+// Validate it belongs to the logged-in user.
+// =====================================================
+$active_trip_id = (int) ($_GET['trip_id'] ?? 0);
+$active_trip = null;
+
+if ($active_trip_id > 0) {
+    $stmt = $conn->prepare("SELECT Trip_ID, Trip_Name FROM TRIP WHERE Trip_ID = ? AND User_ID = ?");
+    $stmt->bind_param("ii", $active_trip_id, $user_id);
+    $stmt->execute();
+    $active_trip = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    // If trip doesn't belong to user, ignore it
+    if (!$active_trip) {
+        $active_trip_id = 0;
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_trip'])) {
     $trip_id = (int) $_POST['trip_id'];
     $city_id = (int) $_POST['city_id'];
@@ -62,6 +83,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_trip'])) {
             $stmt->bind_param("iiiss", $trip_id, $city_id, $next_order, $arrival_date, $departure_date);
             if ($stmt->execute()) {
                 $success_message = "City added to your trip successfully!";
+                // Keep the same trip active after adding, for convenience
+                $active_trip_id = $trip_id;
             } else {
                 $error_message = "Something went wrong. Please try again.";
             }
@@ -128,6 +151,15 @@ if ($sort_by === 'name') {
   text-transform: uppercase; letter-spacing: 0.05em;
   color: #fff; padding: 4px 10px; border-radius: 20px; margin-top: 6px;
 }
+.active-trip-banner {
+  background-color: var(--card);
+  border: 1.5px dashed var(--gold);
+  border-radius: 12px;
+  padding: 12px 18px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 20px;
+}
 </style>
 </head>
 <body>
@@ -140,6 +172,12 @@ if ($sort_by === 'name') {
 <h2 class="section-title mb-1"><i class="bi bi-geo-alt"></i> Search Cities</h2>
 <p class="text-muted mb-0">Find your next destination and add it straight to a trip.</p>
 </div>
+
+<?php if ($active_trip): ?>
+<div class="active-trip-banner">
+<i class="bi bi-signpost-2"></i> Adding cities to: <strong><?php echo htmlspecialchars($active_trip['Trip_Name']); ?></strong>
+</div>
+<?php endif; ?>
 
 <?php if ($success_message): ?>
 <div class="alert alert-success"><i class="bi bi-check-circle"></i> <?php echo htmlspecialchars($success_message); ?></div>
@@ -156,6 +194,9 @@ if ($sort_by === 'name') {
 <?php endif; ?>
 
 <form method="GET" class="row g-2 mb-4">
+<?php if ($active_trip_id > 0): ?>
+<input type="hidden" name="trip_id" value="<?php echo $active_trip_id; ?>">
+<?php endif; ?>
 <div class="col-md-4">
 <label class="form-label"><i class="bi bi-search"></i> City Name</label>
 <input type="text" name="search" class="form-control" placeholder="Search city name..."
@@ -254,7 +295,7 @@ data-bs-toggle="modal" data-bs-target="#addModal<?php echo $city['City_ID']; ?>"
 <select name="trip_id" class="form-select" required>
 <option value="">-- Choose a trip --</option>
 <?php foreach ($user_trips as $trip): ?>
-<option value="<?php echo $trip['Trip_ID']; ?>">
+<option value="<?php echo $trip['Trip_ID']; ?>" <?php echo ($active_trip_id === (int) $trip['Trip_ID']) ? 'selected' : ''; ?>>
 <?php echo htmlspecialchars($trip['Trip_Name']); ?>
 </option>
 <?php endforeach; ?>
