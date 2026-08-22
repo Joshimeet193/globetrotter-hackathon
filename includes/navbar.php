@@ -7,6 +7,8 @@ Before including this file, set a variable:
    $active_page = 'dashboard'; // or 'city-search', 'activity-search', 'my-trips', 'profile'
 That variable is used below to highlight the current link.
 NOTE: calling page must have session_start() before this include.
+Scroll behavior (navbar-scrolled class) + mobile-menu-close
+are both handled by js/script.js — don't duplicate here.
 */
 ?>
 <nav class="navbar navbar-expand-lg shadow-sm sticky-top" id="gtMainNavbar">
@@ -56,12 +58,3 @@ NOTE: calling page must have session_start() before this include.
 </div>
 </div>
 </nav>
-<script>
-(function () {
-  const nav = document.getElementById('gtMainNavbar');
-  if (!nav) return;
-  window.addEventListener('scroll', function () {
-    nav.classList.toggle('navbar-scrolled', window.scrollY > 40);
-  }, { passive: true });
-})();
-</script>
