@@ -60,12 +60,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_trip'])) {
 }
 
 $sql = "SELECT Trip_ID, Trip_Name, Start_Date, End_Date, Description, Cover_Photo
-        FROM TRIP WHERE User_ID = ? ORDER BY Start_Date DESC";
+        FROM TRIP WHERE User_ID = ?";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $trips = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
+
+// ----- Classify each trip as Upcoming / Ongoing / Past -----
+$today = date('Y-m-d');
+foreach ($trips as $key => $trip) {
+    if ($trip['End_Date'] < $today) {
+        $trips[$key]['status'] = 'past';
+    } elseif ($trip['Start_Date'] <= $today && $trip['End_Date'] >= $today) {
+        $trips[$key]['status'] = 'ongoing';
+    } else {
+        $trips[$key]['status'] = 'upcoming';
+    }
+}
+
+// ----- Search / filter / sort (GET params, no page it needs to hit DB again for) -----
+$search_term   = trim($_GET['search'] ?? '');
+$filter_status = $_GET['status'] ?? '';
+$sort_by       = $_GET['sort'] ?? 'newest';
+
+$trips = array_filter($trips, function ($trip) use ($search_term, $filter_status) {
+    $matches_search = $search_term === '' || stripos($trip['Trip_Name'], $search_term) !== false;
+    $matches_status = $filter_status === '' || $trip['status'] === $filter_status;
+    return $matches_search && $matches_status;
+});
+
+usort($trips, function ($a, $b) use ($sort_by) {
+    switch ($sort_by) {
+        case 'oldest':
+            return strcmp($a['Start_Date'], $b['Start_Date']);
+        case 'name':
+            return strcasecmp($a['Trip_Name'], $b['Trip_Name']);
+        case 'newest':
+        default:
+            return strcmp($b['Start_Date'], $a['Start_Date']);
+    }
+});
+
+if (isset($_GET['error']) && $_GET['error'] === 'trip_not_found') {
+    $error_message = "That trip wasn't found, or you don't have access to it.";
+}
 
 $active_page = 'my-trips';
 ?>
@@ -84,9 +123,16 @@ $active_page = 'my-trips';
 <?php include 'includes/navbar.php'; ?>
 
 <div class="container py-5">
-<div class="d-flex justify-content-between align-items-center mb-4">
-<h1 class="section-title mb-0"><i class="bi bi-suitcase-lg"></i> My Trips</h1>
+<div class="dashboard-hero mb-4">
+<div class="row align-items-center">
+<div class="col-md-8">
+<h1 class="section-title mb-1"><i class="bi bi-suitcase-lg"></i> My Trips</h1>
+<p class="text-muted mb-0">All your adventures, planned and past, in one place.</p>
+</div>
+<div class="col-md-4 text-md-end mt-3 mt-md-0">
 <a href="create-trip.php" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Plan New Trip</a>
+</div>
+</div>
 </div>
 
 <?php if ($success_message): ?>
@@ -96,20 +142,61 @@ $active_page = 'my-trips';
 <div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> <?php echo htmlspecialchars($error_message); ?></div>
 <?php endif; ?>
 
+<!-- ===== SEARCH + FILTER + SORT ===== -->
+<form method="GET" class="row g-2 mb-4">
+<div class="col-md-5">
+<label class="form-label"><i class="bi bi-search"></i> Search Trips</label>
+<input type="text" name="search" class="form-control" placeholder="Search by trip name..."
+value="<?php echo htmlspecialchars($search_term); ?>">
+</div>
+<div class="col-md-3">
+<label class="form-label">Status</label>
+<select name="status" class="form-select">
+<option value="">All Trips</option>
+<option value="upcoming" <?php echo $filter_status === 'upcoming' ? 'selected' : ''; ?>>Upcoming</option>
+<option value="ongoing" <?php echo $filter_status === 'ongoing' ? 'selected' : ''; ?>>Ongoing</option>
+<option value="past" <?php echo $filter_status === 'past' ? 'selected' : ''; ?>>Past</option>
+</select>
+</div>
+<div class="col-md-3">
+<label class="form-label">Sort By</label>
+<select name="sort" class="form-select">
+<option value="newest" <?php echo $sort_by === 'newest' ? 'selected' : ''; ?>>Start Date (Newest)</option>
+<option value="oldest" <?php echo $sort_by === 'oldest' ? 'selected' : ''; ?>>Start Date (Oldest)</option>
+<option value="name" <?php echo $sort_by === 'name' ? 'selected' : ''; ?>>Name (A-Z)</option>
+</select>
+</div>
+<div class="col-md-1 d-flex align-items-end">
+<button type="submit" class="btn btn-primary w-100"><i class="bi bi-funnel"></i></button>
+</div>
+</form>
+
 <div class="row g-4">
 <?php if (count($trips) === 0): ?>
 <div class="col-12">
 <p class="text-muted text-center py-5">
 <i class="bi bi-map" style="font-size: 2.5rem;"></i><br>
-You haven't planned any trips yet. Click "Plan New Trip" to get started!
+<?php echo ($search_term !== '' || $filter_status !== '') ? 'No trips match your search or filter.' : 'You haven\'t planned any trips yet. Click "Plan New Trip" to get started!'; ?>
 </p>
 </div>
 <?php else: ?>
 <?php foreach ($trips as $trip): ?>
+<?php
+$status_badge = [
+    'upcoming' => ['label' => 'Upcoming', 'class' => 'bg-secondary'],
+    'ongoing'  => ['label' => 'Ongoing',  'class' => 'bg-success'],
+    'past'     => ['label' => 'Past',     'class' => 'bg-outline-primary'],
+][$trip['status']];
+?>
 <div class="col-md-6 col-lg-4">
 <div class="card h-100">
+<div class="position-relative">
 <img src="<?php echo !empty($trip['Cover_Photo']) ? htmlspecialchars($trip['Cover_Photo']) : 'https://placehold.co/400x300?text=' . urlencode($trip['Trip_Name']); ?>"
      class="card-img-top" alt="<?php echo htmlspecialchars($trip['Trip_Name']); ?>">
+<span class="badge <?php echo $status_badge['class']; ?> position-absolute top-0 end-0 m-2">
+<?php echo $status_badge['label']; ?>
+</span>
+</div>
 <div class="card-body d-flex flex-column">
 <h5 class="card-title"><?php echo htmlspecialchars($trip['Trip_Name']); ?></h5>
 <p class="card-text text-muted small mb-2">
