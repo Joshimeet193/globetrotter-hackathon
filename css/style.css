@@ -56,7 +56,16 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .card-title {
 a { color: var(--stamp); text-decoration: none; transition: color 0.25s ease; }
 a:hover { color: var(--stamp-dark); }
 
-.badge-custom { font-family: 'Space Mono', monospace; }
+.badge-custom {
+  background-color: var(--teal);
+  color: #ffffff;
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  font-family: 'Space Mono', monospace;
+}
 
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(20px); }
@@ -232,15 +241,6 @@ a:hover { color: var(--stamp-dark); }
 .card-title { font-size: 1.15rem; margin-bottom: 8px; }
 .card-text { color: var(--ink-soft); font-size: 0.92rem; }
 
-.badge-custom {
-  background-color: var(--teal);
-  color: #ffffff;
-  border-radius: 20px;
-  padding: 5px 14px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-}
 .status-upcoming { background-color: var(--teal) !important; }
 .status-ongoing  { background-color: var(--stamp) !important; }
 .status-past     { background-color: var(--ink-soft) !important; }
