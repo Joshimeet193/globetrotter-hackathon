@@ -6,16 +6,15 @@ Reusable navbar so every page looks the same.
 Before including this file, set a variable:
    $active_page = 'dashboard'; // or 'city-search', 'activity-search', 'my-trips'
 That variable is used below to highlight the current link.
-
-Fixed: was using classes navbar-gt / btn-gt-primary / btn-gt-outline
-which aren't confirmed to exist in css/style.css. Swapped for the
-navbar/btn classes already used (and working) on dashboard.php,
-city-search.php and activity-search.php.
 */
 ?>
-<nav class="navbar navbar-expand-lg shadow-sm sticky-top">
+<nav class="navbar navbar-expand-lg shadow-sm sticky-top" id="gtMainNavbar">
 <div class="container">
-<a class="navbar-brand" href="dashboard.php">🌍 GlobeTrotter</a>
+
+<a class="navbar-brand d-flex align-items-center gap-2" href="dashboard.php">
+<span>🌍 GlobeTrotter</span>
+<span class="d-none d-lg-inline" style="font-family:'Space Mono',monospace; font-size:0.65rem; letter-spacing:0.08em; color: var(--gold); border:1px solid rgba(255,255,255,0.25); padding:2px 8px; border-radius:20px;">GT&#8209;01</span>
+</a>
 
 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#gtNavbar">
 <span class="navbar-toggler-icon"></span>
@@ -60,3 +59,15 @@ city-search.php and activity-search.php.
 </div>
 </div>
 </nav>
+
+<script>
+// Adds the "navbar-scrolled" class (tighter padding + deeper shadow,
+// already styled in css/style.css) once the page scrolls past 40px.
+(function () {
+  const nav = document.getElementById('gtMainNavbar');
+  if (!nav) return;
+  window.addEventListener('scroll', function () {
+    nav.classList.toggle('navbar-scrolled', window.scrollY > 40);
+  }, { passive: true });
+})();
+</script>
