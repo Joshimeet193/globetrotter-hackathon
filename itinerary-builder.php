@@ -137,8 +137,8 @@ $active_page = 'my-trips';
 <div class="d-flex justify-content-between align-items-center flex-wrap mb-2 gap-2">
 <h1 class="section-title mb-0"><i class="bi bi-map"></i> <?php echo htmlspecialchars($trip['Trip_Name']); ?></h1>
 <div class="d-flex gap-2">
-<a href="city-search.php" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle"></i> Add City</a>
-<a href="activity-search.php" class="btn btn-secondary btn-sm"><i class="bi bi-plus-circle"></i> Add Activity</a>
+<a href="city-search.php?trip_id=<?php echo $trip_id; ?>" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle"></i> Add City</a>
+<a href="activity-search.php?trip_id=<?php echo $trip_id; ?>" class="btn btn-secondary btn-sm"><i class="bi bi-plus-circle"></i> Add Activity</a>
 </div>
 </div>
 
