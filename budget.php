@@ -117,16 +117,7 @@ $is_over_budget = $budget_limit > 0 && $total_spent > $budget_limit;
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg">
-<div class="container">
-<a class="navbar-brand" href="dashboard.php">🌍 GlobeTrotter</a>
-<div class="ms-auto">
-<a href="dashboard.php" class="nav-link d-inline"><i class="bi bi-house"></i> Dashboard</a>
-<a href="my-trips.php" class="nav-link d-inline"><i class="bi bi-suitcase"></i> My Trips</a>
-<a href="logout.php" class="nav-link d-inline"><i class="bi bi-box-arrow-right"></i> Logout</a>
-</div>
-</div>
-</nav>
+<?php $active_page = 'my-trips'; include 'includes/navbar.php'; ?>
 
 <div class="container py-section">
 
@@ -301,5 +292,6 @@ onclick="return confirm('Delete this expense?');">
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
+<script src="js/script.js"></script>
 </body>
 </html>
